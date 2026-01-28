@@ -62,11 +62,11 @@
             // "image": "registry.cloudflare.com/vibesdk-production-userappsandboxservice:cfe197fc",
             // Altering max_instances value will have no effect. Please use the MAX_SANDBOX_INSTANCES var instead.
 			"max_instances": 10,
-            // ATTENTION: Altering instance_type value will have no effect. Please use the SANDBOX_INSTANCE_TYPE var instead.
+            // ATTENTION: Altering  value will have no effect. Please use the SANDBOX_ var instead.
             "instance_type": {
-                "vcpu": 4,
-                "memory_mib": 8192,
-                "disk_mb": 10240
+                "vcpu": 2,  // Reduced from 4
+    "memory_mib": 8192,  // 8 GiB is fine for 2 vCPUs
+    "disk_mb": 10240
             },
             "rollout_step_percentage": 100
 		}
