@@ -70,7 +70,7 @@
 
       "instance_type": {
         "vcpu": 4,
-        "memory_mib": 8192,
+        "memory_mib": 12288,
         "disk_mb": 10240
       },
 
@@ -109,14 +109,15 @@
     ]
   },
 
-    "r2_buckets": [
+  "r2_buckets": [
     {
-        "binding": "TEMPLATES_BUCKET",
-        "bucket_name": "vibesdk-templates-frok",
-        "preview_bucket_name": "vibesdk-templates-frok",
-        "remote": true
+      "binding": "TEMPLATES_BUCKET",
+      "bucket_name": "vibesdk-templates-frok",
+      "preview_bucket_name": "vibesdk-templates-frok",
+      "remote": true
     }
-    ],
+  ],
+
   "kv_namespaces": [
     {
       "binding": "VibecoderStore",
