@@ -1,7 +1,7 @@
 {
 	"name": "build-vibe-production",
 	"private": true,
-	"version": "1.4.0",
+	"version": "1.0.0",
 	"type": "module",
 	"scripts": {
 		"setup": "tsx scripts/setup.ts",
