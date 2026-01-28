@@ -109,15 +109,14 @@
     ]
   },
 
-  "r2_buckets": [
+    "r2_buckets": [
     {
-      "binding": "TEMPLATES_BUCKET",
-      "bucket_name": "vibesdk-templates-fork",
-      "preview_bucket_name": "vibesdk-templates-fork",
-      "remote": true
+        "binding": "TEMPLATES_BUCKET",
+        "bucket_name": "vibesdk-templates-frok",
+        "preview_bucket_name": "vibesdk-templates-frok",
+        "remote": true
     }
-  ],
-
+    ],
   "kv_namespaces": [
     {
       "binding": "VibecoderStore",
