@@ -1,5 +1,5 @@
 export interface ProjectStage {
-    id: 'bootstrap' | 'blueprint' | 'code';
+    id: 'bootstrap' | 'blueprint' | 'code' | 'validate' | 'fix';
     title: string;
     status: 'pending' | 'active' | 'completed' | 'error';
     metadata?: string;
@@ -17,6 +17,8 @@ export const initialStages: ProjectStage[] = [
         status: 'pending',
     },
     { id: 'code', title: 'Generating code', status: 'pending' },
+    { id: 'validate', title: 'Reviewing & fixing code', status: 'pending' },
+    { id: 'fix', title: 'Fixing issues', status: 'pending' },
 ];
 
 /**

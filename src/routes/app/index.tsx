@@ -3,7 +3,6 @@ import { useParams, useNavigate, useSearchParams } from 'react-router';
 import type { AppDetailsData, FileType } from '@/api-types';
 import { apiClient, ApiError } from '@/lib/api-client';
 import { appEvents } from '@/lib/app-events';
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import {
 	Star,
 	Eye,
@@ -23,10 +22,10 @@ import {
 	Globe,
 	Trash2,
 	Github,
-	GitBranch,
 } from 'lucide-react';
 import { MonacoEditor } from '@/components/monaco-editor/monaco-editor';
 import { getFileType } from '@/utils/string';
+import { SmartPreviewIframe } from '@/routes/chat/components/smart-preview-iframe';
 import { Button } from '@/components/ui/button';
 import {
 	Card,
@@ -43,10 +42,7 @@ import { formatDistanceToNow, isValid } from 'date-fns';
 import { toast } from 'sonner';
 import { capitalizeFirstLetter, cn, getPreviewUrl } from '@/lib/utils';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { GitCloneModal } from '@/components/shared/GitCloneModal';
-import { GitCloneCommand, GitClonePrivatePrompt } from '@/components/shared/GitCloneInline';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
-import { PreviewIframe } from '../chat/components/preview-iframe';
 
 // Use proper types from API types
 type AppDetails = AppDetailsData;
@@ -90,16 +86,13 @@ export default function AppView() {
 	const [error, setError] = useState<string | null>(null);
 	const [isFavorited, setIsFavorited] = useState(false);
 	const [isStarred, setIsStarred] = useState(false);
-	const { copied: urlCopied, copy: copyUrl } = useCopyToClipboard();
-	const { copy: copyFile } = useCopyToClipboard({ successMessage: 'Code copied to clipboard' });
-	const { copy: copyPrompt } = useCopyToClipboard({ successMessage: 'Prompt copied to clipboard' });
+	const [copySuccess, setCopySuccess] = useState(false);
 	const [activeTab, setActiveTab] = useState('preview');
 	const [isDeploying, setIsDeploying] = useState(false);
 	const [deploymentProgress, setDeploymentProgress] = useState<string>('');
 	const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
-	const [isGitCloneModalOpen, setIsGitCloneModalOpen] = useState(false);
 	const [activeFilePath, setActiveFilePath] = useState<string>();
 	const previewIframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -376,7 +369,10 @@ export default function AppView() {
 
 	const handleCopyUrl = () => {
 		if (!appUrl) return;
-		copyUrl(appUrl);
+
+		navigator.clipboard.writeText(appUrl);
+		setCopySuccess(true);
+		setTimeout(() => setCopySuccess(false), 2000);
 	};
 
 	const getAppUrl = () => {
@@ -611,17 +607,6 @@ export default function AppView() {
 									{isStarred ? 'Starred' : 'Star'}
 								</Button>
 
-								{/* Git Clone Button */}
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setIsGitCloneModalOpen(true)}
-									className="gap-2 text-text-primary"
-								>
-									<GitBranch className="h-4 w-4" />
-									Git Clone
-								</Button>
-
 								{/* GitHub Repository Button */}
 								{app.githubRepositoryUrl && (
 									<Button
@@ -731,10 +716,8 @@ export default function AppView() {
 					onValueChange={setActiveTab}
 					className="flex flex-col flex-1 gap-2"
 				>
-					{/* Tab switcher and Git Clone inline */}
-					<div className="flex items-center gap-4">
-						{/* Using proper TabsList and TabsTrigger components */}
-						<TabsList className="inline-flex h-auto w-fit items-center gap-0.5 bg-bg-2 dark:bg-bg-1 rounded-md p-0.5 border border-border-primary/30">
+					{/* Using proper TabsList and TabsTrigger components */}
+					<TabsList className="inline-flex h-auto w-fit items-center gap-0.5 bg-bg-2 dark:bg-bg-1 rounded-md p-0.5 border border-border-primary/30 ml-0">
 						<TabsTrigger 
 							value="preview" 
 							className="px-3 py-1.5 rounded text-xs font-medium data-[state=active]:bg-bg-4 dark:data-[state=active]:bg-bg-3 data-[state=active]:text-text-primary data-[state=active]:shadow-sm"
@@ -765,75 +748,62 @@ export default function AppView() {
 							)} />
 							Prompt
 						</TabsTrigger>
-						</TabsList>
-						
-						{/* Git Clone - Inline with tabs */}
-						<div className="flex-shrink-0">
-							{app.visibility === 'public' ? (
-								<GitCloneCommand
-									cloneUrl={`${window.location.protocol}//${window.location.host}/apps/${app.id}.git`}
-									appTitle={app.title}
-								/>
-							) : isOwner ? (
-								<GitClonePrivatePrompt
-									onOpenModal={() => setIsGitCloneModalOpen(true)}
-								/>
-							) : null}
-						</div>
-					</div>
+					</TabsList>
 
 					<TabsContent value="preview" className="flex-1">
 						<Card className="px-2">
 							<CardHeader className="overflow-hidden rounded-t">
-								<div className="flex items-center gap-4 min-w-0">
-									<CardTitle className="text-base flex-shrink-0">
+								<div className="flex items-center justify-between">
+									<CardTitle className="text-base">
 										Live Preview
 									</CardTitle>
-									{/* Preview URL action buttons */}
-									{appUrl && (
-										<div className="ml-auto flex items-center gap-0 flex-shrink-0">
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={handleCopyUrl}
-												className="gap-2"
-															>
-																{urlCopied ? (
-																	<>
-																		<Check className="h-3 w-3" />
-																		Copied!
-																	</>
-																) : (
-																	<>
-																		<Copy className="h-3 w-3" />
-																	</>
-																)}
-															</Button>
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={() =>
-													window.open(
-														appUrl,
-														'_blank',
-													)
-												}
-												className="gap-2"
-											>
-												<ExternalLink className="h-3 w-3" />
-											</Button>
-										</div>
-									)}
+									<div className="flex items-center gap-0">
+										{appUrl && (
+											<>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={handleCopyUrl}
+													className="gap-2"
+												>
+													{copySuccess ? (
+														<>
+															<Check className="h-3 w-3" />
+															Copied!
+														</>
+													) : (
+														<>
+															<Copy className="h-3 w-3" />
+														</>
+													)}
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() =>
+														window.open(
+															appUrl,
+															'_blank',
+														)
+													}
+													className="gap-2"
+												>
+													<ExternalLink className="h-3 w-3" />
+												</Button>
+											</>
+										)}
+									</div>
 								</div>
 							</CardHeader>
 							<CardContent className="p-0">
 								<div className="border-t relative">
 									{appUrl ? (
-										<PreviewIframe
+										<SmartPreviewIframe
 											ref={previewIframeRef}
 											src={appUrl}
 											className="w-full h-[600px] lg:h-[800px]"
 											title={`${app.title} Preview`}
+											devMode={false}
 										/>
 									) : (
 										<div className="relative w-full h-[400px] bg-gray-50 flex items-center justify-center">
@@ -911,11 +881,16 @@ export default function AppView() {
 									{activeFile && (
 										<Button
 											variant="ghost"
-																			size="sm"
-																			onClick={() => {
-																			void copyFile(activeFile.fileContents);
-																		}}
-																			className="gap-2"
+											size="sm"
+											onClick={() => {
+												navigator.clipboard.writeText(
+													activeFile.fileContents,
+												);
+												toast.success(
+													'Code copied to clipboard',
+												);
+											}}
+											className="gap-2"
 										>
 											<Copy className="h-3 w-3" />
 											Copy File
@@ -995,7 +970,7 @@ export default function AppView() {
 																		'on',
 																	scrollBeyondLastLine: false,
 																	fontSize: 13,
-																	theme: 'vibesdk',
+																	theme: 'v1-dev',
 																	automaticLayout: true,
 																}}
 															/>
@@ -1061,10 +1036,10 @@ export default function AppView() {
 												size="sm"
 												onClick={() => {
 													const prompt = app?.agentSummary?.query || app?.originalPrompt;
-																		if (prompt) {
-																			void copyPrompt(prompt);
-																		}
-
+													if (prompt) {
+														navigator.clipboard.writeText(prompt);
+														toast.success('Prompt copied to clipboard');
+													}
 												}}
 												className="gap-2"
 											>
@@ -1097,16 +1072,6 @@ export default function AppView() {
 				onConfirm={handleDeleteApp}
 				isLoading={isDeleting}
 				appTitle={app?.title}
-			/>
-
-			{/* Git Clone Modal */}
-			<GitCloneModal
-				open={isGitCloneModalOpen}
-				onOpenChange={setIsGitCloneModalOpen}
-				appId={app.id}
-				appTitle={app.title}
-				isPublic={app.visibility === 'public'}
-				isOwner={isOwner}
 			/>
 		</div>
 	);

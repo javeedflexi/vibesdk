@@ -1,15 +1,24 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useState } from 'react';
 import { Check, Link2 } from 'react-feather';
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 
 const MotionCheck = motion.create(Check);
 const MotionLink = motion.create(Link2);
 
 export function Copy({ text }: { text: string }) {
-	const { copied, copy } = useCopyToClipboard();
+	const [copied, setCopied] = useState(false);
 
 	return (
-		<button className="p-1" onClick={() => copy(text)}>
+		<button
+			className="p-1"
+			onClick={() => {
+				navigator.clipboard.writeText(text);
+				setCopied(true);
+				setTimeout(() => {
+					setCopied(false);
+				}, 2500);
+			}}
+		>
 			<AnimatePresence>
 				{copied ? (
 					<MotionCheck

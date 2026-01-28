@@ -1,25 +1,22 @@
 import { useEffect } from 'react';
 import { apiClient } from '@/lib/api-client';
-import { useAuth } from './contexts/auth-context';
 
 export default function TestSSOUser() {
-	const { user } = useAuth();
-	console.log(user);
-
-	const fetchUser = async () => {
-		try {
-			const response = await apiClient.getUserByEmail(user?.email || '');
-
-			console.log(response.data);
-		} catch (err) {
-			console.log(err);
-		}
-	};
 	useEffect(() => {
-		if (user?.email) {
-			fetchUser();
-		}
-	}, [user]);
+		const fetchUser = async () => {
+			try {
+				const response = await apiClient.getUserByEmail(
+					'developer@flexifunnels.com',
+				);
+
+				console.log(response.data?.user);
+			} catch (err) {
+				console.log(err);
+			}
+		};
+
+		fetchUser();
+	}, []);
 
 	return <div>test</div>;
 }

@@ -10,6 +10,7 @@ import AppsPage from './routes/apps';
 import AppView from './routes/app';
 import DiscoverPage from './routes/discover';
 import { ProtectedRoute } from './routes/protected-route';
+import Test from './Test';
 
 const routes = [
 	{
@@ -26,15 +27,21 @@ const routes = [
 			},
 			{
 				path: 'profile',
-				element: React.createElement(ProtectedRoute, { children: React.createElement(Profile) }),
+				element: React.createElement(ProtectedRoute, {
+					children: React.createElement(Profile),
+				}),
 			},
 			{
 				path: 'settings',
-				element: React.createElement(ProtectedRoute, { children: React.createElement(Settings) }),
+				element: React.createElement(ProtectedRoute, {
+					children: React.createElement(Settings),
+				}),
 			},
 			{
 				path: 'apps',
-				element: React.createElement(ProtectedRoute, { children: React.createElement(AppsPage) }),
+				element: React.createElement(ProtectedRoute, {
+					children: React.createElement(AppsPage),
+				}),
 			},
 			{
 				path: 'app/:id',
@@ -43,6 +50,10 @@ const routes = [
 			{
 				path: 'discover',
 				Component: DiscoverPage,
+			},
+			{
+				path: 'test',
+				Component: Test,
 			},
 		],
 	},

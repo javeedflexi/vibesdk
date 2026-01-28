@@ -1,9 +1,6 @@
-import type { BlueprintType, PhasicBlueprint } from '@/api-types';
+import type { BlueprintType } from '@/api-types';
 import clsx from 'clsx';
 import { Markdown } from './messages';
-
-const isPhasicBlueprint = (blueprint: BlueprintType): blueprint is PhasicBlueprint =>
-	'views' in blueprint;
 
 export function Blueprint({
 	blueprint,
@@ -13,8 +10,6 @@ export function Blueprint({
 	blueprint: BlueprintType;
 }) {
 	if (!blueprint) return null;
-
-	const phasicBlueprint = isPhasicBlueprint(blueprint) ? blueprint : null;
 
 	return (
 		<div className={clsx('w-full flex flex-col', className)} {...props}>
@@ -89,13 +84,13 @@ export function Blueprint({
 				</div>
 
 				{/* Views */}
-				{phasicBlueprint && phasicBlueprint.views?.length > 0 && (
+				{Array.isArray(blueprint.views) && blueprint.views.length > 0 && (
 					<div>
 						<h3 className="text-sm font-medium mb-3 text-text-50/70 uppercase tracking-wider">
 							Views
 						</h3>
 						<div className="space-y-3">
-							{phasicBlueprint.views?.map((view, index) => (
+							{blueprint.views.map((view, index) => (
 								<div key={`view-${index}`} className="space-y-1">
 									<h4 className="text-xs font-medium text-text-50/70">
 										{view.name}
@@ -110,41 +105,41 @@ export function Blueprint({
 				)}
 
 				{/* User Flow */}
-				{phasicBlueprint?.userFlow && (
+				{blueprint.userFlow && (
 					<div>
 						<h3 className="text-sm font-medium mb-3 text-text-50/70 uppercase tracking-wider">
 							User Flow
 						</h3>
 						<div className="space-y-4">
-							{phasicBlueprint.userFlow.uiLayout && (
+							{blueprint.userFlow?.uiLayout && (
 								<div>
 									<h4 className="text-xs font-medium mb-2 text-text-50/70">
 										UI Layout
 									</h4>
 									<Markdown className="text-sm text-text-50">
-									{phasicBlueprint.userFlow.uiLayout}
+										{blueprint.userFlow.uiLayout}
 									</Markdown>
 								</div>
 							)}
 
-							{phasicBlueprint.userFlow.uiDesign && (
+							{blueprint.userFlow?.uiDesign && (
 								<div>
 									<h4 className="text-xs font-medium mb-2 text-text-50/70">
 										UI Design
 									</h4>
 									<Markdown className="text-sm text-text-50">
-									{phasicBlueprint.userFlow.uiDesign}
+										{blueprint.userFlow.uiDesign}
 									</Markdown>
 								</div>
 							)}
 
-							{phasicBlueprint.userFlow.userJourney && (
+							{blueprint.userFlow?.userJourney && (
 								<div>
 									<h4 className="text-xs font-medium mb-2 text-text-50/70">
 										User Journey
 									</h4>
 									<Markdown className="text-sm text-text-50">
-									{phasicBlueprint.userFlow.userJourney}
+										{blueprint.userFlow?.userJourney}
 									</Markdown>
 								</div>
 							)}
@@ -153,25 +148,25 @@ export function Blueprint({
 				)}
 
 				{/* Data Flow */}
-				{phasicBlueprint && (phasicBlueprint.dataFlow || phasicBlueprint.architecture?.dataFlow) && (
+				{(blueprint.dataFlow || blueprint.architecture?.dataFlow) && (
 					<div>
 						<h3 className="text-sm font-medium mb-2 text-text-50/70 uppercase tracking-wider">
 							Data Flow
 						</h3>
 						<Markdown className="text-sm text-text-50">
-							{phasicBlueprint.dataFlow || phasicBlueprint.architecture?.dataFlow}
+							{blueprint.dataFlow || blueprint.architecture?.dataFlow}
 						</Markdown>
 					</div>
 				)}
 
 				{/* Implementation Roadmap */}
-				{phasicBlueprint && phasicBlueprint.implementationRoadmap?.length > 0 && (
+				{Array.isArray(blueprint.implementationRoadmap) && blueprint.implementationRoadmap.length > 0 && (
 					<div>
 						<h3 className="text-sm font-medium mb-2 text-text-50/70 uppercase tracking-wider">
 							Implementation Roadmap
 						</h3>
 						<div className="space-y-3">
-							{phasicBlueprint.implementationRoadmap?.map((roadmapItem, index) => (
+							{blueprint.implementationRoadmap.map((roadmapItem, index) => (
 								<div key={`roadmap-${index}`} className="space-y-1">
 									<h4 className="text-xs font-medium text-text-50/70">
 										Phase {index + 1}: {roadmapItem.phase}
@@ -186,7 +181,7 @@ export function Blueprint({
 				)}
 
 				{/* Initial Phase */}
-				{phasicBlueprint?.initialPhase && (
+				{blueprint.initialPhase && (
 					<div>
 						<h3 className="text-sm font-medium mb-2 text-text-50/70 uppercase tracking-wider">
 							Initial Phase
@@ -194,18 +189,18 @@ export function Blueprint({
 						<div className="space-y-3">
 							<div>
 								<h4 className="text-xs font-medium mb-2 text-text-50/70">
-									{phasicBlueprint.initialPhase.name}
+									{blueprint.initialPhase.name}
 								</h4>
 								<Markdown className="text-sm text-text-50 mb-3">
-									{phasicBlueprint.initialPhase.description}
+									{blueprint.initialPhase.description}
 								</Markdown>
-								{Array.isArray(phasicBlueprint.initialPhase.files) && phasicBlueprint.initialPhase.files.length > 0 && (
+								{Array.isArray(blueprint.initialPhase.files) && blueprint.initialPhase.files.length > 0 && (
 									<div>
 										<h5 className="text-xs font-medium mb-2 text-text-50/60">
 											Files to be created:
 										</h5>
 										<div className="space-y-2">
-										{phasicBlueprint.initialPhase.files.map((file, fileIndex) => (
+											{blueprint.initialPhase.files.map((file, fileIndex) => (
 												<div key={`initial-phase-file-${fileIndex}`} className="border-l-2 border-text/10 pl-3">
 													<div className="font-mono text-xs text-text-50/80">{file.path}</div>
 													<div className="text-xs text-text-50/60">{file.purpose}</div>
@@ -220,14 +215,14 @@ export function Blueprint({
 				)}
 
 				{/* Pitfalls */}
-				{phasicBlueprint && phasicBlueprint.pitfalls?.length > 0 && (
+				{Array.isArray(blueprint.pitfalls) && blueprint.pitfalls.length > 0 && (
 					<div>
 						<h3 className="text-sm font-medium mb-2 text-text-50/70 uppercase tracking-wider">
 							Pitfalls
 						</h3>
 						<div className="prose prose-sm prose-invert">
 							<ul className="">
-								{phasicBlueprint.pitfalls?.map((pitfall, index) => (
+								{blueprint.pitfalls?.map((pitfall, index) => (
 									<li key={`pitfall-${index}`} className="">
 										{pitfall}
 									</li>

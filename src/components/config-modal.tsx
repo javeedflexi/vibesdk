@@ -3,7 +3,7 @@
  * Three-mode interface: Platform Models, BYOK (Bring Your Own Key), Custom Providers
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Settings, Play, RotateCcw, Info, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,13 +24,14 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient } from '@/lib/api-client';
 import { ByokApiKeysModal } from './byok-api-keys-modal';
-import type {
-  ModelConfig,
-  UserModelConfigWithMetadata,
-  ModelConfigUpdate,
-  ByokProvidersData,
-  AgentDisplayConfig
+import type { 
+  ModelConfig, 
+  UserModelConfigWithMetadata, 
+  ModelConfigUpdate, 
+  AIModels,
+  ByokProvidersData
 } from '@/api-types';
+import type { AgentDisplayConfig } from './model-config-tabs';
 
 interface ConfigModalProps {
   isOpen: boolean;
@@ -59,22 +60,26 @@ const hasUserKeyForModel = (modelName: string, byokProviders: Array<{ provider: 
   return byokProviders.some(p => p.provider === provider && p.hasValidKey);
 };
 
+// Helper to get clean model display name
+const getModelDisplayName = (model: AIModels | string): string => {
+  return typeof model === 'string' ? model : model;
+};
 
 // Model recommendations by agent
 const getModelRecommendation = (agentAction: string) => {
   const recommendations: Record<string, string> = {
-    templateSelection: 'Recommended: Fast models for quick template selection',
-    blueprint: 'Recommended: Creative models for architecture design',
-    projectSetup: 'Recommended: Reliable models for precise setup',
-    phaseGeneration: 'Recommended: Large context models for comprehensive planning',
-    firstPhaseImplementation: 'Recommended: High-capability models for foundation development',
-    phaseImplementation: 'Recommended: Strong coding models for implementation',
-    realtimeCodeFixer: 'Recommended: Fast debugging models',
-    fastCodeFixer: 'Recommended: Ultra-fast models for quick fixes',
-    conversationalResponse: 'Recommended: Balanced models for natural conversation',
-    codeReview: 'Recommended: Analytical models with large context',
-    fileRegeneration: 'Recommended: Pure coding models',
-    screenshotAnalysis: 'Recommended: Vision-capable models for image analysis'
+    templateSelection: '💡 Recommended: Fast models for quick template selection',
+    blueprint: '🏗️ Recommended: Creative models for architecture design',
+    projectSetup: '⚙️ Recommended: Reliable models for precise setup',
+    phaseGeneration: '📋 Recommended: Large context models for comprehensive planning',
+    firstPhaseImplementation: '🏁 Recommended: High-capability models for foundation development',
+    phaseImplementation: '⚡ Recommended: Strong coding models for implementation',
+    realtimeCodeFixer: '🚀 Recommended: Fast debugging models',
+    fastCodeFixer: '⚡ Recommended: Ultra-fast models for quick fixes',
+    conversationalResponse: '💬 Recommended: Balanced models for natural conversation',
+    codeReview: '🔍 Recommended: Analytical models with large context',
+    fileRegeneration: '📝 Recommended: Pure coding models',
+    screenshotAnalysis: '👁️ Recommended: Vision-capable models for image analysis'
   };
   return recommendations[agentAction] || '';
 };
@@ -93,6 +98,7 @@ export function ConfigModal({
   // Form state
   const [formData, setFormData] = useState({
     modelName: userConfig?.name || 'default',
+    maxTokens: userConfig?.max_tokens?.toString() || '',
     temperature: userConfig?.temperature?.toString() || '',
     reasoningEffort: userConfig?.reasoning_effort || 'default',
     fallbackModel: userConfig?.fallbackModel || 'default'
@@ -109,12 +115,11 @@ export function ConfigModal({
   const [byokData, setByokData] = useState<ByokProvidersData | null>(null);
   const [loadingByok, setLoadingByok] = useState(false);
 
-  // Load BYOK data (filtered by agent constraints)
-  const loadByokData = useCallback(async () => {
+  // Load BYOK data
+  const loadByokData = async () => {
     try {
       setLoadingByok(true);
-      // Pass agent key to get constraint-filtered models
-      const response = await apiClient.getByokProviders(agentConfig.key);
+      const response = await apiClient.getByokProviders();
       if (response.success && response.data) {
         setByokData(response.data);
       }
@@ -123,7 +128,7 @@ export function ConfigModal({
     } finally {
       setLoadingByok(false);
     }
-  }, [agentConfig.key]);
+  };
 
   // Handle modal open/close lifecycle
   useEffect(() => {
@@ -131,6 +136,7 @@ export function ConfigModal({
       // First time opening - reset everything and load data
       setFormData({
         modelName: userConfig?.name || 'default',
+        maxTokens: userConfig?.max_tokens?.toString() || '',
         temperature: userConfig?.temperature?.toString() || '',
         reasoningEffort: userConfig?.reasoning_effort || 'default',
         fallbackModel: userConfig?.fallbackModel || 'default'
@@ -143,7 +149,7 @@ export function ConfigModal({
       // Modal closed - reset for next time
       setIsInitialOpen(false);
     }
-  }, [isOpen, isInitialOpen, userConfig, loadByokData]);
+  }, [isOpen, isInitialOpen, userConfig]);
 
   // Load BYOK data when modal opens
   useEffect(() => {
@@ -156,6 +162,7 @@ export function ConfigModal({
   useEffect(() => {
     const originalFormData = {
       modelName: userConfig?.name || 'default',
+      maxTokens: userConfig?.max_tokens?.toString() || '',
       temperature: userConfig?.temperature?.toString() || '',
       reasoningEffort: userConfig?.reasoning_effort || 'default',
       fallbackModel: userConfig?.fallbackModel || 'default'
@@ -181,7 +188,7 @@ export function ConfigModal({
           
           models.push({
             value: modelStr,
-            label: modelStr,
+            label: getModelDisplayName(modelStr),
             provider,
             hasUserKey,
             byokAvailable: true
@@ -197,7 +204,7 @@ export function ConfigModal({
       if (!processedModels.has(modelStr)) {
         models.push({
           value: modelStr,
-          label: modelStr,
+          label: getModelDisplayName(modelStr),
           provider: '',
           hasUserKey: false,
           byokAvailable: false
@@ -239,6 +246,7 @@ export function ConfigModal({
   const buildCurrentConfig = (): ModelConfigUpdate => {
     return {
       ...(formData.modelName !== 'default' && { modelName: formData.modelName }),
+      ...(formData.maxTokens && { maxTokens: parseInt(formData.maxTokens) }),
       ...(formData.temperature && { temperature: parseFloat(formData.temperature) }),
       ...(formData.reasoningEffort !== 'default' && { reasoningEffort: formData.reasoningEffort }),
       ...(formData.fallbackModel !== 'default' && { fallbackModel: formData.fallbackModel }),
@@ -281,30 +289,18 @@ export function ConfigModal({
             <Settings className="h-5 w-5" />
             Configure {agentConfig.name}
           </DialogTitle>
-          <DialogDescription>
-            {agentConfig.description}
+          <DialogDescription className="space-y-2">
+            <p>{agentConfig.description}</p>
+            {getModelRecommendation(agentConfig.key) && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  {getModelRecommendation(agentConfig.key)}
+                </AlertDescription>
+              </Alert>
+            )}
           </DialogDescription>
         </DialogHeader>
-
-        {/* Alerts outside DialogDescription to avoid nested p/div issues */}
-        <div className="space-y-2 -mt-2">
-          {agentConfig.constraint?.enabled && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                Model selection limited to {agentConfig.constraint.allowedModels.length} allowed model{agentConfig.constraint.allowedModels.length !== 1 ? 's' : ''} for this operation.
-              </AlertDescription>
-            </Alert>
-          )}
-          {getModelRecommendation(agentConfig.key) && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                {getModelRecommendation(agentConfig.key)}
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
 
         <div className="space-y-6">
           {/* Current Status */}
@@ -432,7 +428,7 @@ export function ConfigModal({
           <div className="space-y-4">
             <h4 className="font-medium text-sm">Parameters</h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Temperature */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Temperature</Label>
@@ -449,6 +445,25 @@ export function ConfigModal({
                 {defaultConfig?.temperature && (
                   <p className="text-xs text-text-tertiary">
                     🔧 Default: {defaultConfig.temperature}
+                  </p>
+                )}
+              </div>
+
+              {/* Max Tokens */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Max Tokens</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="200000"
+                  value={formData.maxTokens}
+                  placeholder={defaultConfig?.max_tokens ? `${defaultConfig.max_tokens}` : '4000'}
+                  onChange={(e) => setFormData({...formData, maxTokens: e.target.value})}
+                  className="h-10"
+                />
+                {defaultConfig?.max_tokens && (
+                  <p className="text-xs text-text-tertiary">
+                    🔧 Default: {defaultConfig.max_tokens?.toLocaleString()}
                   </p>
                 )}
               </div>

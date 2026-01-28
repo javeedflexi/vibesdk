@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { LucideNetwork, ChevronRight, File } from 'lucide-react';
-import type { FileType } from '@/api-types';
+import type { FileType } from '../hooks/use-chat';
 import clsx from 'clsx';
 
 interface FileTreeItem {
@@ -120,14 +120,16 @@ function buildFileTree(files: FileType[]): FileTreeItem[] {
 
 export function FileExplorer({
 	files,
+	bootstrapFiles,
 	currentFile,
 	onFileClick,
 }: {
 	files: FileType[];
+	bootstrapFiles: FileType[];
 	currentFile: FileType | undefined;
 	onFileClick: (file: FileType) => void;
 }) {
-	const fileTree = buildFileTree(files);
+	const fileTree = buildFileTree([...bootstrapFiles, ...files]);
 
 	return (
 		<div className="w-full max-w-[200px] bg-bg-3 border-r border-text/10 h-full overflow-y-auto">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
 	Dialog,
 	DialogContent,
@@ -19,12 +19,7 @@ import { Label } from '@/components/ui/label';
 // 	SelectItem,
 // } from '@/components/ui/select';
 import { useAuth } from '@/contexts/auth-context';
-import { apiClient, ApiError } from '@/lib/api-client';
-import { AppDetailsData } from '@/api-types';
-import { useParams } from 'react-router';
-
-// Use proper types from API types
-type AppDetails = AppDetailsData;
+import { apiClient } from '@/lib/api-client';
 
 interface DeployToProjectPopupProps {
 	open: boolean;
@@ -36,7 +31,6 @@ interface DeployToProjectPopupProps {
 	setIsDeploy: (open: boolean) => void;
 	deploymentUrl: string;
 	setDeployData?: (data: Record<string, any>) => void;
-	isCurrentlyDeploying?: boolean;
 }
 
 export function DeployToProjectPopup({
@@ -45,65 +39,15 @@ export function DeployToProjectPopup({
 	onConfirm,
 	title = 'Deploy to Project',
 	description = 'Select a project and enter page details to deploy.',
-	// isLoading = false,
+	isLoading = false,
 	setIsDeploy,
 	deploymentUrl,
 	setDeployData,
-	isCurrentlyDeploying,
 }: DeployToProjectPopupProps) {
-	const { id } = useParams();
 	const { user } = useAuth();
 	const [pageName, setPageName] = useState<string>('');
 	const [pagePath, setPagePath] = useState<string>('');
 	const [userDetails, setUserDetails] = useState<Record<string, any>>({});
-	const [app, setApp] = useState<AppDetails | null>(null);
-
-	const fetchAppDetails = useCallback(async () => {
-		if (!id) return;
-
-		try {
-			// setLoading(true);
-			// setError(null);
-
-			// Fetch app details using API client
-			const appResponse = await apiClient.getAppDetails(id);
-
-			if (appResponse.success && appResponse.data) {
-				const appData = appResponse.data;
-				setApp(appData);
-				// setIsFavorited(appData.userFavorited || false);
-				// setIsStarred(appData.userStarred || false);
-			} else {
-				throw new Error(
-					appResponse.error?.message || 'Failed to fetch app details',
-				);
-			}
-		} catch (err) {
-			console.error('Error fetching app:', err);
-			if (err instanceof ApiError) {
-				if (err.status === 404) {
-					// setError('App not found');
-				} else {
-					// setError(`Failed to load app: ${err.message}`);
-				}
-			} else {
-				// setError(
-				// 	err instanceof Error ? err.message : 'Failed to load app',
-				// );
-			}
-		}
-		// finally {
-		// 	// setLoading(false);
-		// }
-	}, [id]);
-
-	useEffect(() => {
-		if (open) {
-			fetchAppDetails();
-			console.log('appdetails 1', app);
-			console.log('Id 1', id);
-		}
-	}, [id, fetchAppDetails]);
 
 	const extractSubdomain = (url: string): string | null => {
 		try {
@@ -115,18 +59,8 @@ export function DeployToProjectPopup({
 		}
 	};
 
-	// ✅ Only extract if deploymentUrl is defined and not empty
-	let deploymentId: string | null = null;
-
-	if (deploymentUrl) {
-		deploymentId = extractSubdomain(deploymentUrl);
-		console.log(
-			'Deployment ID:',
-			deploymentId,
-			'User Details:',
-			userDetails,
-		);
-	}
+	const deploymentId = extractSubdomain(deploymentUrl);
+	console.log(deploymentId, userDetails);
 
 	const getUserID = async () => {
 		try {
@@ -142,13 +76,13 @@ export function DeployToProjectPopup({
 	};
 
 	//deploymentId: string | null
-	const handleCreateProjectAndPage = async (deploymentId: string) => {
+	const handleCreateProjectAndPage = async () => {
 		const res = await apiClient.createProjectAndPage(
 			3,
 			pagePath,
 			pageName,
 			100,
-			deploymentId,
+			// deploymentId,
 		);
 
 		if (res.success && res.data !== undefined && res.data !== null) {
@@ -164,8 +98,8 @@ export function DeployToProjectPopup({
 			await onConfirm();
 
 			// Only proceed if deploymentId is valid
-			if (deploymentUrl && deploymentId) {
-				await handleCreateProjectAndPage(deploymentId);
+			if (deploymentId) {
+				await handleCreateProjectAndPage();
 			} else {
 				console.warn('onConfirm failed or returned false');
 			}
@@ -178,12 +112,8 @@ export function DeployToProjectPopup({
 		if (!open) {
 			setPageName('');
 			setPagePath('');
-			setApp(null);
 		} else {
-			if (user?.email) {
-				getUserID();
-			}
-			console.log('appdetails 2', app);
+			getUserID();
 		}
 	}, [open]);
 
@@ -230,18 +160,16 @@ export function DeployToProjectPopup({
 					<Button
 						variant="outline"
 						onClick={() => onOpenChange(false)}
-						disabled={isCurrentlyDeploying}
+						disabled={isLoading}
 					>
 						Cancel
 					</Button>
 					<Button
 						onClick={handleDeploy}
-						disabled={
-							isCurrentlyDeploying || !pageName || !pagePath
-						}
+						disabled={isLoading || !pageName || !pagePath}
 						className="bg-green-600 text-white hover:bg-green-700"
 					>
-						{isCurrentlyDeploying ? (
+						{isLoading ? (
 							<>
 								<Loader2 className="h-4 w-4 animate-spin mr-2" />
 								Deploying...

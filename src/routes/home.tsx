@@ -2,9 +2,10 @@ import { useRef, useState, useEffect, useMemo } from 'react';
 import { ArrowRight, Info } from 'react-feather';
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/contexts/auth-context';
-import { ProjectModeSelector, type ProjectModeOption } from '../components/project-mode-selector';
-import { MAX_AGENT_QUERY_LENGTH, SUPPORTED_IMAGE_MIME_TYPES, type ProjectType } from '@/api-types';
-import { useFeature } from '@/features';
+import {
+	AgentModeToggle,
+	type AgentMode,
+} from '../components/agent-mode-toggle';
 import { useAuthGuard } from '../hooks/useAuthGuard';
 import { usePaginatedApps } from '@/hooks/use-paginated-apps';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
@@ -14,70 +15,39 @@ import { useImageUpload } from '@/hooks/use-image-upload';
 import { useDragDrop } from '@/hooks/use-drag-drop';
 import { ImageUploadButton } from '@/components/image-upload-button';
 import { ImageAttachmentPreview } from '@/components/image-attachment-preview';
-import { toast } from 'sonner';
+import { SUPPORTED_IMAGE_MIME_TYPES } from '@/api-types';
 
 export default function Home() {
 	const navigate = useNavigate();
 	const { requireAuth } = useAuthGuard();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const [projectMode, setProjectMode] = useState<ProjectType>('app');
+	const [agentMode, setAgentMode] = useState<AgentMode>('deterministic');
 	const [query, setQuery] = useState('');
 	const { user } = useAuth();
-	const { isLoadingCapabilities, capabilities, getEnabledFeatures } = useFeature();
 
-	const modeOptions = useMemo<ProjectModeOption[]>(() => {
-		if (isLoadingCapabilities || !capabilities) return [];
-		return getEnabledFeatures().map((def) => ({
-			id: def.id,
-			label:
-				def.id === 'presentation'
-					? 'Slides'
-					: def.id === 'general'
-						? 'General'
-						: 'App',
-			description: def.description,
-		}));
-	}, [capabilities, getEnabledFeatures, isLoadingCapabilities]);
-
-	const showModeSelector = modeOptions.length > 1;
-
-	useEffect(() => {
-		if (isLoadingCapabilities) return;
-		if (modeOptions.length === 0) {
-			if (projectMode !== 'app') setProjectMode('app');
-			return;
-		}
-		if (!modeOptions.some((m) => m.id === projectMode)) {
-			setProjectMode(modeOptions[0].id);
-		}
-	}, [isLoadingCapabilities, modeOptions, projectMode]);
-
-	const { images, addImages, removeImage, clearImages, isProcessing } = useImageUpload({
-		onError: (error) => {
-			console.error('Image upload error:', error);
-			toast.error(error);
-		},
-	});
+	const { images, addImages, removeImage, clearImages, isProcessing } =
+		useImageUpload({
+			onError: (error) => {
+				// TODO: Show error toast/notification
+				console.error('Image upload error:', error);
+			},
+		});
 
 	const { isDragging, dragHandlers } = useDragDrop({
 		onFilesDropped: addImages,
 		accept: [...SUPPORTED_IMAGE_MIME_TYPES],
 	});
 
-
-	const placeholderPhrases = useMemo(() => [
-		"todo list app",
-		"F1 fantasy game",
-		"personal finance tracker"
-	], []);
-	const [currentPlaceholderPhraseIndex, setCurrentPlaceholderPhraseIndex] = useState(0);
-	const [currentPlaceholderText, setCurrentPlaceholderText] = useState("");
+	const placeholderPhrases = useMemo(
+		() => ['todo list app', 'F1 fantasy game', 'personal finance tracker'],
+		[],
+	);
+	const [currentPlaceholderPhraseIndex, setCurrentPlaceholderPhraseIndex] =
+		useState(0);
+	const [currentPlaceholderText, setCurrentPlaceholderText] = useState('');
 	const [isPlaceholderTyping, setIsPlaceholderTyping] = useState(true);
 
-	const {
-		apps,
-		loading,
-	} = usePaginatedApps({
+	const { apps, loading } = usePaginatedApps({
 		type: 'public',
 		defaultSort: 'popular',
 		defaultPeriod: 'week',
@@ -85,22 +55,21 @@ export default function Home() {
 	});
 
 	// Discover section should appear only when enough apps are available and loading is done
-	const discoverReady = useMemo(() => !loading && (apps?.length ?? 0) > 5, [loading, apps]);
+	const discoverReady = useMemo(
+		() => !loading && (apps?.length ?? 0) > 5,
+		[loading, apps],
+	);
 
-	const handleCreateApp = (query: string, mode: ProjectType) => {
-		if (query.length > MAX_AGENT_QUERY_LENGTH) {
-			toast.error(
-				`Prompt too large (${query.length} characters). Maximum allowed is ${MAX_AGENT_QUERY_LENGTH} characters.`,
-			);
-			return;
-		}
-
+	const handleCreateApp = (query: string, mode: AgentMode) => {
 		const encodedQuery = encodeURIComponent(query);
 		const encodedMode = encodeURIComponent(mode);
 
 		// Encode images as JSON if present
-		const imageParam = images.length > 0 ? `&images=${encodeURIComponent(JSON.stringify(images))}` : '';
-		const intendedUrl = `/chat/new?query=${encodedQuery}&projectType=${encodedMode}${imageParam}`;
+		const imageParam =
+			images.length > 0
+				? `&images=${encodeURIComponent(JSON.stringify(images))}`
+				: '';
+		const intendedUrl = `/chat/new?query=${encodedQuery}&agentMode=${encodedMode}${imageParam}`;
 
 		if (
 			!requireAuth({
@@ -140,7 +109,12 @@ export default function Home() {
 		if (isPlaceholderTyping) {
 			if (currentPlaceholderText.length < currentPhrase.length) {
 				const timeout = setTimeout(() => {
-					setCurrentPlaceholderText(currentPhrase.slice(0, currentPlaceholderText.length + 1));
+					setCurrentPlaceholderText(
+						currentPhrase.slice(
+							0,
+							currentPlaceholderText.length + 1,
+						),
+					);
 				}, 100); // Typing speed
 				return () => clearTimeout(timeout);
 			} else {
@@ -153,16 +127,25 @@ export default function Home() {
 		} else {
 			if (currentPlaceholderText.length > 0) {
 				const timeout = setTimeout(() => {
-					setCurrentPlaceholderText(currentPlaceholderText.slice(0, -1));
+					setCurrentPlaceholderText(
+						currentPlaceholderText.slice(0, -1),
+					);
 				}, 50); // Erasing speed
 				return () => clearTimeout(timeout);
 			} else {
 				// Move to next phrase
-				setCurrentPlaceholderPhraseIndex((prev) => (prev + 1) % placeholderPhrases.length);
+				setCurrentPlaceholderPhraseIndex(
+					(prev) => (prev + 1) % placeholderPhrases.length,
+				);
 				setIsPlaceholderTyping(true);
 			}
 		}
-	}, [currentPlaceholderText, currentPlaceholderPhraseIndex, isPlaceholderTyping, placeholderPhrases]);
+	}, [
+		currentPlaceholderText,
+		currentPlaceholderPhraseIndex,
+		isPlaceholderTyping,
+		placeholderPhrases,
+	]);
 
 	const discoverLinkRef = useRef<HTMLDivElement>(null);
 
@@ -187,24 +170,25 @@ export default function Home() {
 							></circle>
 						</pattern>
 					</defs>
-					<rect
-						width="100%"
-						height="100%"
-						fill="url(#:S2:)"
-					></rect>
+					<rect width="100%" height="100%" fill="url(#:S2:)"></rect>
 				</svg>
 			</div>
-			
+
 			<LayoutGroup>
 				<div className="rounded-md w-full max-w-2xl overflow-hidden">
 					<motion.div
 						layout
-						transition={{ layout: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } }}
+						transition={{
+							layout: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+						}}
 						className={clsx(
-							"px-6 p-8 flex flex-col items-center z-10",
-							discoverReady ? "mt-48" : "mt-[20vh] sm:mt-[24vh] md:mt-[28vh]"
-						)}>
-						<h1 className="text-shadow-sm text-shadow-red-200 dark:text-shadow-red-900 text-accent font-medium leading-[1.1] tracking-tight text-5xl w-full mb-4 bg-clip-text bg-gradient-to-r from-text-primary to-text-primary/90">
+							'px-6 p-8 flex flex-col items-center z-10',
+							discoverReady
+								? 'mt-48'
+								: 'mt-[20vh] sm:mt-[24vh] md:mt-[28vh]',
+						)}
+					>
+						<h1 className="text-shadow-sm text-shadow-green-200 dark:text-shadow-green-900 text-accent font-medium leading-[1.1] tracking-tight text-5xl w-full mb-4 bg-clip-text bg-gradient-to-r from-text-primary to-text-primary/90">
 							What should we build today?
 						</h1>
 
@@ -213,82 +197,94 @@ export default function Home() {
 							onSubmit={(e) => {
 								e.preventDefault();
 								const query = textareaRef.current!.value;
-								handleCreateApp(query, projectMode);
+								handleCreateApp(query, agentMode);
 							}}
-							className="flex z-10 flex-col w-full min-h-[150px] bg-bg-4 border border-accent/30 dark:border-accent/50 dark:bg-bg-2 rounded-[18px] shadow-textarea p-5 transition-all duration-200"
+							className="flex z-10 flex-col w-full min-h-[150px] bg-bg-4 dark:bg-bg-2 rounded-[18px] shadow-textarea p-5 transition-all duration-200 relative overflow-hidden border border-accent/20"
 						>
-							<div 
-								className={clsx(
-									"flex-1 flex flex-col relative",
-									isDragging && "ring-2 ring-accent ring-offset-2 rounded-lg"
-								)}
-								{...dragHandlers}
-							>
-								{isDragging && (
-									<div className="absolute inset-0 flex items-center justify-center bg-accent/10 backdrop-blur-sm rounded-lg z-30 pointer-events-none">
-										<p className="text-accent font-medium">Drop images here</p>
-									</div>
-								)}
-								<textarea
-									className="w-full resize-none ring-0 z-20 outline-0 placeholder:text-text-primary/60 text-text-primary"
-									name="query"
-									value={query}
-									placeholder={`Create a ${currentPlaceholderText}`}
-									ref={textareaRef}
-									onChange={(e) => {
-										setQuery(e.target.value);
-										adjustTextareaHeight();
-									}}
-									onInput={adjustTextareaHeight}
-									onKeyDown={(e) => {
-										if (e.key === 'Enter' && !e.shiftKey) {
-											e.preventDefault();
-											const query = textareaRef.current!.value;
-											handleCreateApp(query, projectMode);
-										}
-									}}
-								/>
-								{images.length > 0 && (
-									<div className="mt-3">
-										<ImageAttachmentPreview
-											images={images}
-											onRemove={removeImage}
-										/>
-									</div>
-								)}
+							{/* Animated Border */}
+							<div className="absolute inset-0 rounded-[18px] p-[1px] animate-spin-slow pointer-events-none">
+								<div className="absolute inset-0 rounded-[18px] bg-[conic-gradient(from_0deg,transparent_0%,#10b981_50%,transparent_100%)]"></div>
 							</div>
-							<div
-								className={clsx(
-									'flex items-center mt-4 pt-1',
-									showModeSelector ? 'justify-between' : 'justify-end',
-								)}
-							>
-								{showModeSelector && (
-									<ProjectModeSelector
-										value={projectMode}
-										onChange={setProjectMode}
-										modes={modeOptions}
-										className="flex-1"
-									/>
-								)}
+							<div className="absolute inset-[1px] bg-bg-4 dark:bg-bg-2 rounded-[17px] z-[1]"></div>
 
-								<div className={clsx('flex items-center gap-2', showModeSelector && 'ml-4')}>
-									<ImageUploadButton
-										onFilesSelected={addImages}
-										disabled={isProcessing}
+							<div className="relative z-[2]">
+								<div
+									className={clsx(
+										'flex-1 flex flex-col relative',
+										isDragging &&
+											'ring-2 ring-accent ring-offset-2 rounded-lg',
+									)}
+									{...dragHandlers}
+								>
+									{isDragging && (
+										<div className="absolute inset-0 flex items-center justify-center bg-accent/10 backdrop-blur-sm rounded-lg z-30 pointer-events-none">
+											<p className="text-accent font-medium">
+												Drop images here
+											</p>
+										</div>
+									)}
+									<textarea
+										className="w-full resize-none ring-0 z-20 outline-0 placeholder:text-text-primary/60 text-text-primary bg-transparent"
+										name="query"
+										value={query}
+										placeholder={`Create a ${currentPlaceholderText}`}
+										ref={textareaRef}
+										onChange={(e) => {
+											setQuery(e.target.value);
+											adjustTextareaHeight();
+										}}
+										onInput={adjustTextareaHeight}
+										onKeyDown={(e) => {
+											if (
+												e.key === 'Enter' &&
+												!e.shiftKey
+											) {
+												e.preventDefault();
+												const query =
+													textareaRef.current!.value;
+												handleCreateApp(
+													query,
+													agentMode,
+												);
+											}
+										}}
 									/>
-									<button
-										type="submit"
-										disabled={!query.trim()}
-										className="bg-accent text-white p-1 rounded-md *:size-5 transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-									>
-										<ArrowRight />
-									</button>
+									{images.length > 0 && (
+										<div className="mt-3">
+											<ImageAttachmentPreview
+												images={images}
+												onRemove={removeImage}
+											/>
+										</div>
+									)}
+								</div>
+								<div className="flex items-center justify-between mt-4 pt-1">
+									{import.meta.env.VITE_AGENT_MODE_ENABLED ? (
+										<AgentModeToggle
+											value={agentMode}
+											onChange={setAgentMode}
+											className="flex-1"
+										/>
+									) : (
+										<div></div>
+									)}
+									<div className="flex items-center justify-end ml-4 gap-2">
+										<ImageUploadButton
+											onFilesSelected={addImages}
+											disabled={isProcessing}
+										/>
+										<button
+											type="submit"
+											disabled={!query.trim()}
+											className="bg-accent text-white p-1 rounded-md *:size-5 transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+										>
+											<ArrowRight />
+										</button>
+									</div>
 								</div>
 							</div>
 						</form>
 					</motion.div>
-
 				</div>
 
 				<AnimatePresence>
@@ -302,7 +298,13 @@ export default function Home() {
 							<div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-bg-4/50 dark:bg-bg-2/50 border border-accent/20 dark:border-accent/30 shadow-sm">
 								<Info className="size-4 text-accent flex-shrink-0 mt-0.5" />
 								<p className="text-xs text-text-tertiary leading-relaxed">
-									<span className="font-medium text-text-secondary">Images Beta:</span> Images guide app layout and design but may not be replicated exactly. The coding agent cannot access images directly for app assets.
+									<span className="font-medium text-text-secondary">
+										Images Beta:
+									</span>{' '}
+									Images guide app layout and design but may
+									not be replicated exactly. The coding agent
+									cannot access images directly for app
+									assets.
 								</p>
 							</div>
 						</motion.div>
@@ -315,25 +317,41 @@ export default function Home() {
 							key="discover-section"
 							layout
 							initial={{ opacity: 0, height: 0 }}
-							animate={{ opacity: 1, height: "auto" }}
+							animate={{ opacity: 1, height: 'auto' }}
 							exit={{ opacity: 0, height: 0 }}
-							transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-							className={clsx('max-w-6xl mx-auto px-4 z-10', images.length > 0 ? 'mt-10' : 'mt-16 mb-8')}
+							transition={{
+								duration: 0.5,
+								ease: [0.22, 1, 0.36, 1],
+							}}
+							className={clsx(
+								'max-w-6xl mx-auto px-4 z-10',
+								images.length > 0 ? 'mt-10' : 'mt-16 mb-8',
+							)}
 						>
-							<div className='flex flex-col items-start'>
-								<h2 className="text-2xl font-medium text-text-secondary/80">Discover Apps built by the community</h2>
-								<div ref={discoverLinkRef} className="text-md font-light mb-4 text-text-tertiary hover:underline underline-offset-4 select-text cursor-pointer" onClick={() => navigate('/discover')} >View All</div>
+							<div className="flex flex-col items-start">
+								<h2 className="text-2xl font-medium text-text-secondary/80">
+									Discover Apps built by the community
+								</h2>
+								<div
+									ref={discoverLinkRef}
+									className="text-md font-light mb-4 text-text-tertiary hover:underline underline-offset-4 select-text cursor-pointer"
+									onClick={() => navigate('/discover')}
+								>
+									View All
+								</div>
 								<motion.div
 									layout
 									transition={{ duration: 0.4 }}
 									className="grid grid-cols-2 xl:grid-cols-3 gap-6"
 								>
 									<AnimatePresence mode="popLayout">
-										{apps.map(app => (
+										{apps.map((app) => (
 											<AppCard
 												key={app.id}
 												app={app}
-												onClick={() => navigate(`/app/${app.id}`)}
+												onClick={() =>
+													navigate(`/app/${app.id}`)
+												}
 												showStats={true}
 												showUser={true}
 												showActions={false}
@@ -348,12 +366,15 @@ export default function Home() {
 			</LayoutGroup>
 
 			{/* Nudge towards Discover */}
-			{user && <CurvedArrow sourceRef={discoverLinkRef} target={{ x: 50, y: window.innerHeight - 60 }} />}
+			{user && (
+				<CurvedArrow
+					sourceRef={discoverLinkRef}
+					target={{ x: 50, y: window.innerHeight - 60 }}
+				/>
+			)}
 		</div>
 	);
 }
-
-
 
 type ArrowProps = {
 	/** Ref to the source element the arrow starts from */
@@ -411,18 +432,23 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 			Object.entries(centers).map(([side, p]) => [
 				side,
 				(p.x - endPoint.x) ** 2 + (p.y - endPoint.y) ** 2,
-			])
+			]),
 		) as Record<keyof typeof centers, number>;
 
-		const bestSide = (Object.entries(dists).sort((a, b) => a[1] - b[1])[0][0] ||
-			"right") as keyof typeof centers;
+		const bestSide = (Object.entries(dists).sort(
+			(a, b) => a[1] - b[1],
+		)[0][0] || 'right') as keyof typeof centers;
 
 		// Nudge start point slightly outside the element for visual clarity
-		const nudge = (p: Point, side: keyof typeof centers, offset: number) => {
+		const nudge = (
+			p: Point,
+			side: keyof typeof centers,
+			offset: number,
+		) => {
 			switch (side) {
-				case "right":
+				case 'right':
 					return { x: p.x + offset, y: p.y };
-				case "left":
+				case 'left':
 					return { x: p.x - offset, y: p.y };
 			}
 		};
@@ -448,12 +474,12 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 		const onScroll = () => scheduleCompute();
 		const onResize = () => scheduleCompute();
 
-		window.addEventListener("scroll", onScroll, { passive: true });
-		window.addEventListener("resize", onResize);
+		window.addEventListener('scroll', onScroll, { passive: true });
+		window.addEventListener('resize', onResize);
 
 		// Track source element size changes
 		const el = sourceRef.current;
-		if ("ResizeObserver" in window) {
+		if ('ResizeObserver' in window) {
 			roRef.current = new ResizeObserver(() => scheduleCompute());
 			if (el) roRef.current.observe(el);
 		}
@@ -461,8 +487,8 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 		scheduleCompute();
 
 		return () => {
-			window.removeEventListener("scroll", onScroll);
-			window.removeEventListener("resize", onResize);
+			window.removeEventListener('scroll', onScroll);
+			window.removeEventListener('resize', onResize);
 			if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
 			if (roRef.current && el) roRef.current.unobserve(el);
 		};
@@ -470,7 +496,7 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 	}, []);
 
 	const d = useMemo(() => {
-		if (!start || !end) return "";
+		if (!start || !end) return '';
 
 		const dx = end.x - start.x;
 		const dy = end.y - start.y;
@@ -479,8 +505,14 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 		// This gives a nice S or C curve without sharp kinks.
 		const cpOffset = Math.max(Math.abs(dx), Math.abs(dy)) * curvature;
 
-		const c1: Point = { x: start.x + cpOffset * (dx >= 0 ? 1 : -1), y: start.y };
-		const c2: Point = { x: end.x - cpOffset * (dx >= 0 ? 1 : -1), y: end.y };
+		const c1: Point = {
+			x: start.x + cpOffset * (dx >= 0 ? 1 : -1),
+			y: start.y,
+		};
+		const c2: Point = {
+			x: end.x - cpOffset * (dx >= 0 ? 1 : -1),
+			y: end.y,
+		};
 
 		return `M ${start.x},${start.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${end.x},${end.y}`;
 	}, [start, end, curvature]);
@@ -495,24 +527,63 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 		<svg
 			aria-hidden="true"
 			style={{
-				position: "fixed",
+				position: 'fixed',
 				inset: 0,
-				width: "100vw",
-				height: "100vh",
-				pointerEvents: "none",
-				overflow: "visible",
+				width: '100vw',
+				height: '100vh',
+				pointerEvents: 'none',
+				overflow: 'visible',
 				zIndex: 9999,
-				display: hidden ? "none" : "block",
+				display: hidden ? 'none' : 'block',
 			}}
 		>
 			<defs>
-				<filter id="discover-squiggle" x="-20%" y="-20%" width="140%" height="140%">
-					<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" seed="3" result="noise" />
-					<feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G" />
+				<filter
+					id="discover-squiggle"
+					x="-20%"
+					y="-20%"
+					width="140%"
+					height="140%"
+				>
+					<feTurbulence
+						type="fractalNoise"
+						baseFrequency="0.8"
+						numOctaves="1"
+						seed="3"
+						result="noise"
+					/>
+					<feDisplacementMap
+						in="SourceGraphic"
+						in2="noise"
+						scale="1"
+						xChannelSelector="R"
+						yChannelSelector="G"
+					/>
 				</filter>
-				<marker id="discover-arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth" opacity={0.20}>
-					<path d="M 0 1.2 L 7 4" stroke="var(--color-text-tertiary)" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-					<path d="M 0 6.8 L 7 4" stroke="var(--color-text-tertiary)" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+				<marker
+					id="discover-arrowhead"
+					markerWidth="8"
+					markerHeight="8"
+					refX="7"
+					refY="4"
+					orient="auto"
+					markerUnits="strokeWidth"
+					opacity={0.2}
+				>
+					<path
+						d="M 0 1.2 L 7 4"
+						stroke="var(--color-text-tertiary)"
+						strokeWidth="1.6"
+						strokeLinecap="round"
+						fill="none"
+					/>
+					<path
+						d="M 0 6.8 L 7 4"
+						stroke="var(--color-text-tertiary)"
+						strokeWidth="1.2"
+						strokeLinecap="round"
+						fill="none"
+					/>
 				</marker>
 			</defs>
 
@@ -520,7 +591,7 @@ export const CurvedArrow: React.FC<ArrowProps> = ({
 				d={d}
 				// stroke="var(--color-accent)"
 				stroke="var(--color-text-tertiary)"
-				strokeOpacity={0.20}
+				strokeOpacity={0.2}
 				strokeWidth={1.6}
 				fill="none"
 				strokeLinecap="round"

@@ -1,23 +1,19 @@
 import { toast } from 'sonner';
 import { generateId } from '@/utils/id-generator';
-import type { RateLimitError, ConversationMessage } from '@/api-types';
+import type { RateLimitError } from '@/api-types';
 
 export type ToolEvent = {
     name: string;
     status: 'start' | 'success' | 'error';
     timestamp: number;
-    contentLength?: number; // Position in content when event was added (for inline rendering)
-    result?: string; // Tool execution result (for completed tools)
 };
 
-export type ChatMessage = Omit<ConversationMessage, 'content'> & {
-    content: string;
-    ui?: {
-        isThinking?: boolean;
-        toolEvents?: ToolEvent[];
-    };
-    status?: 'queued' | 'active';
-    queuePosition?: number;
+export type ChatMessage = {
+    type: 'user' | 'ai';
+    id: string;
+    message: string;
+    isThinking?: boolean;
+    toolEvents?: ToolEvent[];
 };
 
 /**
@@ -30,29 +26,28 @@ export function isConversationalMessage(messageId: string): boolean {
         'conversation_response',
         'fetching-chat',
         'chat-not-found',
+        'resuming-chat',
         'chat-welcome',
         'deployment-status',
         'code_reviewed',
-        'generation-complete',
-        'core_app_complete',
     ];
     
     return conversationalIds.includes(messageId) || messageId.startsWith('conv-');
 }
 
 /**
- * Create an assistant message
+ * Create an AI message
  */
 export function createAIMessage(
-    conversationId: string,
-    content: string,
+    id: string,
+    message: string,
     isThinking?: boolean
 ): ChatMessage {
     return {
-        role: 'assistant',
-        conversationId,
-        content,
-        ui: { isThinking },
+        type: 'ai',
+        id,
+        message,
+        isThinking,
     };
 }
 
@@ -61,9 +56,9 @@ export function createAIMessage(
  */
 export function createUserMessage(message: string): ChatMessage {
     return {
-        role: 'user',
-        conversationId: generateId(),
-        content: message,
+        type: 'user',
+        id: generateId(),
+        message,
     };
 }
 
@@ -109,21 +104,23 @@ export function handleRateLimitError(
  */
 export function addOrUpdateMessage(
     messages: ChatMessage[],
-    newMessage: ChatMessage,
+    newMessage: Omit<ChatMessage, 'type'>,
+    messageType: 'ai' | 'user' = 'ai'
 ): ChatMessage[] {
-    // Special handling for 'main' assistant message - update if thinking, otherwise append
-    if (newMessage.conversationId === 'main') {
-        const mainMessageIndex = messages.findIndex(m => m.conversationId === 'main' && m.ui?.isThinking);
+    // Special handling for 'main' message - update if thinking, otherwise append
+    if (newMessage.id === 'main') {
+        const mainMessageIndex = messages.findIndex(m => m.id === 'main' && m.isThinking);
         if (mainMessageIndex !== -1) {
             return messages.map((msg, index) =>
                 index === mainMessageIndex 
-                    ? { ...msg, ...newMessage }
+                    ? { ...msg, ...newMessage, type: messageType }
                     : msg
             );
         }
     }
+    
     // For all other messages, append
-    return [...messages, newMessage];
+    return [...messages, { ...newMessage, type: messageType }];
 }
 
 /**
@@ -131,157 +128,68 @@ export function addOrUpdateMessage(
  */
 export function handleStreamingMessage(
     messages: ChatMessage[],
-    conversationId: string,
+    messageId: string,
     chunk: string,
     isNewMessage: boolean
 ): ChatMessage[] {
-    const existingMessageIndex = messages.findIndex(m => m.conversationId === conversationId && m.role === 'assistant');
+    const existingMessageIndex = messages.findIndex(m => m.id === messageId && m.type === 'ai');
+    
     if (existingMessageIndex !== -1 && !isNewMessage) {
-        // Append chunk to existing assistant message
+        // Append chunk to existing message
         return messages.map((msg, index) =>
             index === existingMessageIndex
-                ? { ...msg, content: msg.content + chunk }
+                ? { ...msg, message: msg.message + chunk }
                 : msg
         );
     } else {
-        // Create new streaming assistant message
-        return [...messages, createAIMessage(conversationId, chunk, false)];
+        // Create new streaming message
+        return [...messages, createAIMessage(messageId, chunk, false)];
     }
 }
 
 /**
- * Append or update a tool event
- * - Tool 'start': Add with current position for inline rendering
- * - Tool 'success': Update matching 'start' to 'success' in place (always updates, never adds new)
- * - Tool 'error': Add error event with position for inline rendering
+ * Append or update a tool event inline within an AI message bubble
+ * - If a message with messageId doesn't exist yet, create a placeholder AI message with empty content
+ * - If a matching 'start' exists and a 'success' comes in for the same tool, update that entry in place
  */
 export function appendToolEvent(
     messages: ChatMessage[],
-    conversationId: string,
-    tool: { name: string; status: 'start' | 'success' | 'error'; result?: string }
+    messageId: string,
+    tool: { name: string; status: 'start' | 'success' | 'error' }
 ): ChatMessage[] {
-    const idx = messages.findIndex(m => m.conversationId === conversationId && m.role === 'assistant');
+    const idx = messages.findIndex(m => m.id === messageId && m.type === 'ai');
     const timestamp = Date.now();
 
-    // If message is not present, create a new placeholder assistant message with tool event
+    // If message is not present, create a new placeholder AI message
     if (idx === -1) {
         const newMsg: ChatMessage = {
-            role: 'assistant',
-            conversationId,
-            content: '',
-            ui: {
-                toolEvents: [{
-                    name: tool.name,
-                    status: tool.status,
-                    timestamp,
-                    contentLength: 0
-                }]
-            },
+            type: 'ai',
+            id: messageId,
+            message: '',
+            toolEvents: [{ name: tool.name, status: tool.status, timestamp }],
         };
         return [...messages, newMsg];
     }
 
     return messages.map((m, i) => {
         if (i !== idx) return m;
-        
-        const current = m.ui?.toolEvents ?? [];
-        const currentContentLength = m.content.length;
-        
-        if (tool.status === 'start') {
-            // Add new tool start event with current position
-            return {
-                ...m,
-                ui: {
-                    ...m.ui,
-                    toolEvents: [...current, {
-                        name: tool.name,
-                        status: 'start',
-                        timestamp,
-                        contentLength: currentContentLength
-                    }]
-                }
-            };
-        }
-        
+        const current = m.toolEvents ?? [];
         if (tool.status === 'success') {
-            // Find the matching 'start' event
-            const startEventIndex = current.findIndex(ev => ev.name === tool.name && ev.status === 'start');
-            
-            if (startEventIndex !== -1) {
-                const startEvent = current[startEventIndex];
-                const contentChanged = startEvent.contentLength !== currentContentLength;
-                const isDeepDebug = tool.name === 'deep_debug';
-                
-                // For deep_debug with content changes: add new success event at end (chronological)
-                // For other tools: update in place (avoid duplication)
-                if (isDeepDebug && contentChanged) {
-                    // Remove start event and add success event at current position
+            // Find last 'start' for this tool and flip it to success
+            for (let j = current.length - 1; j >= 0; j--) {
+                if (current[j].name === tool.name) {
                     return {
                         ...m,
-                        ui: {
-                            ...m.ui,
-                            toolEvents: [
-                                ...current.filter((_, j) => j !== startEventIndex),
-                                {
-                                    name: tool.name,
-                                    status: 'success' as const,
-                                    timestamp,
-                                    contentLength: currentContentLength,
-                                    result: tool.result
-                                }
-                            ]
-                        }
+                        toolEvents: current.map((ev, k) =>
+                            k === j ? { ...ev, status: 'success', timestamp } : ev
+                        ),
                     };
                 }
-                
-                // Update in place for other tools or when no content changed
-                return {
-                    ...m,
-                    ui: {
-                        ...m.ui,
-                        toolEvents: current.map((ev, j) =>
-                            j === startEventIndex
-                                ? { 
-                                    name: ev.name, 
-                                    status: 'success' as const, 
-                                    timestamp: startEvent.timestamp, // Keep original timestamp for stable React key
-                                    contentLength: ev.contentLength, // Keep original position
-                                    result: tool.result // Add result if provided
-                                  }
-                                : ev
-                        )
-                    }
-                };
             }
-            
-            // No prior start found, just add success event with position
-            return {
-                ...m,
-                ui: {
-                    ...m.ui,
-                    toolEvents: [...current, {
-                        name: tool.name,
-                        status: 'success',
-                        timestamp,
-                        contentLength: currentContentLength,
-                        result: tool.result
-                    }]
-                }
-            };
+            // If no prior start, just append success as a separate line
+            return { ...m, toolEvents: [...current, { name: tool.name, status: 'success', timestamp }] };
         }
-        
-        // Error status - add with position for inline rendering
-        return {
-            ...m,
-            ui: {
-                ...m.ui,
-                toolEvents: [...current, {
-                    name: tool.name,
-                    status: 'error',
-                    timestamp,
-                    contentLength: currentContentLength
-                }]
-            }
-        };
+        // Default: append event
+        return { ...m, toolEvents: [...current, { name: tool.name, status: tool.status, timestamp }] };
     });
 }

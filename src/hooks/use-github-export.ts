@@ -25,13 +25,7 @@ export interface GitHubInstallationData {
     repositories?: string[];
 }
 
-export type GitHubExportHook = ReturnType<typeof useGitHubExport>;
-
-export function useGitHubExport(
-    _websocket?: WebSocket | null, 
-    agentId?: string,
-    onSuccess?: () => void
-): {
+export function useGitHubExport(_websocket?: WebSocket | null, agentId?: string): {
     isExporting: boolean;
     progress?: GitHubExportProgress;
     result?: GitHubExportResult;
@@ -49,12 +43,15 @@ export function useGitHubExport(
         isModalOpen: false
     });
 
+    // NOTE: WebSocket-based GitHub export has been replaced with secure OAuth flow
+    // All GitHub export now happens via HTTP API with proper OAuth authorization
+
     // Open the export modal
     const openModal = useCallback(() => {
         setState(prev => ({
             ...prev,
             isModalOpen: true,
-            result: undefined
+            result: undefined // Clear any previous results
         }));
     }, []);
 
@@ -69,6 +66,7 @@ export function useGitHubExport(
         }));
     }, []);
 
+    // Check for GitHub export callback results on component mount
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const githubExport = urlParams.get('github_export');
@@ -78,14 +76,14 @@ export function useGitHubExport(
             setState(prev => ({
                 ...prev,
                 isExporting: false,
-                isModalOpen: true,
+                isModalOpen: true, // Auto-open modal to show success result
                 result: {
                     success: true,
                     repositoryUrl: repositoryUrl || undefined
                 }
             }));
             
-            onSuccess?.();
+            // Clean up URL
             const newUrl = new URL(window.location.href);
             newUrl.searchParams.delete('github_export');
             newUrl.searchParams.delete('repository_url');
@@ -109,8 +107,9 @@ export function useGitHubExport(
             newUrl.searchParams.delete('reason');
             window.history.replaceState({}, '', newUrl.toString());
         }
-    }, [onSuccess]);
+    }, []);
 
+    // Start GitHub export with secure backend flow
     const startExport = useCallback(async (options: GitHubExportOptions) => {
         setState(prev => ({
             ...prev,
@@ -120,18 +119,20 @@ export function useGitHubExport(
         }));
 
         try {
+            // Validate agentId is available (should be from URL params)
             if (!agentId) {
                 setState(prev => ({
                     ...prev,
                     isExporting: false,
                     result: {
                         success: false,
-                        error: 'Invalid chat session'
+                        error: 'Invalid chat session. Please ensure you are on a valid chat page.'
                     }
                 }));
                 return;
             }
 
+            // Initiate GitHub export with OAuth flow
             const response = await apiClient.initiateGitHubExport({
                 repositoryName: options.repositoryName,
                 description: options.description,
@@ -139,37 +140,13 @@ export function useGitHubExport(
                 agentId: agentId
             });
 
-            if (response.data?.alreadyExists && response.data?.existingRepositoryUrl) {
-                setState(prev => ({
-                    ...prev,
-                    isExporting: false,
-                    result: {
-                        success: false,
-                        error: 'Repository already exists',
-                        repositoryAlreadyExists: true,
-                        existingRepositoryUrl: response.data?.existingRepositoryUrl || ''
-                    }
-                }));
-                return;
-            }
-            if (response.data?.skippedOAuth && response.data?.repositoryUrl) {
-                setState(prev => ({
-                    ...prev,
-                    isExporting: false,
-                    result: {
-                        success: true,
-                        repositoryUrl: response.data?.repositoryUrl || ''
-                    }
-                }));
-                onSuccess?.();
-                return;
-            }
-
             if (response.data?.authUrl) {
                 setState(prev => ({
                     ...prev,
                     progress: { message: 'Redirecting to GitHub...', step: 'creating_repository', progress: 25 }
                 }));
+                
+                // Small delay for user feedback, then redirect
                 setTimeout(() => {
                     window.location.href = response.data?.authUrl || '';
                 }, 500);
@@ -183,45 +160,19 @@ export function useGitHubExport(
                     }
                 }));
             }
-        } catch (error: unknown) {
-            const apiError = error as { 
-                response?: { 
-                    data?: { 
-                        alreadyExists?: boolean; 
-                        existingRepositoryUrl?: string;
-                    } 
-                }; 
-                data?: { 
-                    alreadyExists?: boolean; 
-                    existingRepositoryUrl?: string;
-                }; 
-                message?: string;
-            };
-            const errorData = apiError?.response?.data || apiError?.data;
-            if (errorData?.alreadyExists && errorData?.existingRepositoryUrl) {
-                setState(prev => ({
-                    ...prev,
-                    isExporting: false,
-                    result: {
-                        success: false,
-                        error: 'Repository already exists',
-                        repositoryAlreadyExists: true,
-                        existingRepositoryUrl: errorData.existingRepositoryUrl
-                    }
-                }));
-                return;
-            }
-            
+        } catch (error: any) {
             setState(prev => ({
                 ...prev,
                 isExporting: false,
                 result: {
                     success: false,
-                    error: apiError?.message || 'Failed to initiate GitHub export'
+                    error: error?.message || 'Failed to initiate GitHub export'
                 }
             }));
         }
-    }, [agentId, onSuccess]);
+    }, [agentId]);
+
+    // Retry function that resets state and allows a new export attempt
     const retry = useCallback(() => {
         setState(prev => ({
             ...prev,

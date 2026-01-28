@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
 	Users,
 	Settings,
@@ -31,7 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import {
 	Tooltip,
@@ -69,6 +69,7 @@ interface AppMenuItemProps {
 	showActions?: boolean;
 	isCollapsed: boolean;
 	getVisibilityIcon: (visibility: App['visibility']) => React.ReactNode;
+	className?: string;
 }
 
 function AppMenuItem({
@@ -78,6 +79,7 @@ function AppMenuItem({
 	showActions = true,
 	isCollapsed,
 	getVisibilityIcon,
+	className = '',
 }: AppMenuItemProps) {
 	const formatTimestamp = () => {
 		if (app.updatedAtFormatted) return app.updatedAtFormatted;
@@ -88,11 +90,11 @@ function AppMenuItem({
 	};
 
 	return (
-		<SidebarMenuItem className="group/app-item">
+		<SidebarMenuItem className={`group/app-item mb-2`}>
 			<SidebarMenuButton
 				asChild
 				tooltip={app.title}
-				className="cursor-pointer transition-opacity hover:opacity-75 pr-0"
+				className="cursor-pointer transition-opacity  pr-0"
 			>
 				<a
 					href={`/app/${app.id}`}
@@ -100,7 +102,8 @@ function AppMenuItem({
 						e.preventDefault();
 						onClick(app.id);
 					}}
-					className="w-full no-underline"
+					// className="w-full no-underline"
+					className={`w-full no-underline ${className} `}
 				>
 					<div className="flex-1 min-w-0 pr-2">
 						<div className="flex items-center gap-2 min-w-0">
@@ -118,7 +121,7 @@ function AppMenuItem({
 									</div>
 								</span>
 
-								<div className="absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-bg-2 to-transparent pointer-events-none" />
+								{/* <div className="absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-bg-2 to-transparent pointer-events-none" /> */}
 							</div>
 						</div>
 						<p className="text-xs text-text-tertiary truncate">
@@ -161,6 +164,8 @@ export function AppSidebar() {
 	const { apps: recentApps, moreAvailable } = useRecentApps();
 	const { apps: favoriteApps } = useFavoriteApps();
 	const { apps: allApps, loading: allAppsLoading } = useApps();
+	const [activeAppId, setActiveAppId] = useState<string | null>(null);
+	const location = useLocation();
 
 	const boards: Board[] = []; // Remove mock boards
 
@@ -196,6 +201,25 @@ export function AppSidebar() {
 		);
 	};
 
+	// useEffect(() => {
+	// 	const storedAppId = localStorage.getItem('activeAppId');
+	// 	if (storedAppId) {
+	// 		setActiveAppId(storedAppId);
+	// 	}
+	// }, []);
+
+	useEffect(() => {
+		const pathSegments = location.pathname.split('/');
+		const appIdFromUrl = pathSegments[2]; //  /app/123 → "123"
+		if (appIdFromUrl) {
+			setActiveAppId(appIdFromUrl);
+			localStorage.setItem('activeAppId', appIdFromUrl);
+		} else {
+			setActiveAppId(null);
+			localStorage.removeItem('activeAppId');
+		}
+	}, [location.pathname]);
+
 	if (!user) return;
 
 	return (
@@ -210,8 +234,7 @@ export function AppSidebar() {
 					{/* Build Button */}
 					<SidebarGroup>
 						<SidebarGroupContent>
-	
-							{location.pathname !== '/' && (
+							{/* {location.pathname !== '/' && (
 								<div
 									className={cn(
 										isCollapsed ? ' pr-2' : 'px-1',
@@ -232,13 +255,55 @@ export function AppSidebar() {
 														if (!isCollapsed) {
 															setOpen(false);
 														}
+														setActiveAppId(null);
+														localStorage.removeItem(
+															'activeAppId',
+														);
 														navigate('/');
 													}}
 												>
 													<Plus className="h-4 w-4 text-neutral-50" />
 													{!isCollapsed && (
 														<span className="font-medium text-neutral-50">
-															New build
+															New Chat
+														</span>
+													)}
+												</button>
+											</TooltipTrigger>
+										</Tooltip>
+									</TooltipProvider>
+								</div>
+							)} */}
+							{location.pathname !== '/' && (
+								<div
+									className={cn(
+										isCollapsed ? 'pr-2' : 'px-1',
+									)}
+								>
+									<TooltipProvider delayDuration={0}>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<button
+													className={cn(
+														'group flex w-full border-[0.5px] border-bg-2 items-center gap-2 font-medium hover:opacity-90 p-2 rounded-md cursor-hand text-neutral-50 transition-colors',
+														isCollapsed
+															? 'justify-center bg-gradient-to-r from-green-700 to-green-400 dark:from-green-900 dark:to-green-500'
+															: 'justify-start bg-gradient-to-r from-green-700 to-green-400 dark:from-green-900 dark:to-green-500',
+													)}
+													onClick={() => {
+														if (!isCollapsed)
+															setOpen(false);
+														setActiveAppId(null);
+														localStorage.removeItem(
+															'activeAppId',
+														);
+														navigate('/');
+													}}
+												>
+													<Plus className="h-4 w-4 text-neutral-50" />
+													{!isCollapsed && (
+														<span className="font-medium text-neutral-50">
+															New Chat
 														</span>
 													)}
 												</button>
@@ -253,7 +318,7 @@ export function AppSidebar() {
 					{!isCollapsed && (
 						<ScrollArea className="flex-1 px-1 relative">
 							{/* Gradient fade overlay for app names at sidebar edge */}
-							<div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg-2 to-transparent pointer-events-none z-10"></div>
+							{/* <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg-2 to-transparent pointer-events-none z-10"></div> */}
 							{/* Navigation */}
 							<SidebarGroup>
 								{expandedGroups.includes('apps') && (
@@ -309,13 +374,23 @@ export function AppSidebar() {
 																		app={
 																			app
 																		}
+																		// onClick={(
+																		// 	id,
+																		// ) => {
+																		// 	navigate(
+																		// 		`/app/${id}`,
+																		// 	);
+																		// }}
 																		onClick={(
 																			id,
-																		) =>
+																		) => {
+																			setActiveAppId(
+																				id,
+																			); // 👈 Store the active app ID
 																			navigate(
 																				`/app/${id}`,
-																			)
-																		}
+																			);
+																		}}
 																		variant="recent"
 																		showActions={
 																			true
@@ -326,6 +401,12 @@ export function AppSidebar() {
 																		getVisibilityIcon={
 																			getVisibilityIcon
 																		}
+																		className={`${
+																			activeAppId ===
+																			app.id
+																				? 'bg-green-500/20 hover:bg-green-500/30'
+																				: 'hover:bg-green-100'
+																		} rounded-md transition-all duration-200`}
 																	/>
 																),
 															)}
@@ -352,11 +433,23 @@ export function AppSidebar() {
 														<AppMenuItem
 															key={app.id}
 															app={app}
-															onClick={(id) =>
+															// onClick={(id) =>
+															// 	navigate(
+															// 		`/app/${id}`,
+															// 	)
+															// }
+															onClick={(id) => {
+																setActiveAppId(
+																	id,
+																);
+																localStorage.setItem(
+																	'activeAppId',
+																	id,
+																);
 																navigate(
 																	`/app/${id}`,
-																)
-															}
+																);
+															}}
 															variant="recent"
 															showActions={true}
 															isCollapsed={
@@ -365,6 +458,12 @@ export function AppSidebar() {
 															getVisibilityIcon={
 																getVisibilityIcon
 															}
+															className={`${
+																activeAppId ===
+																app.id
+																	? 'bg-green-200 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 border-l-4 border-green-500'
+																	: 'hover:bg-green-100 dark:hover:bg-green-900'
+															} rounded-md `}
 														/>
 													))}
 													{moreAvailable && (
@@ -399,7 +498,7 @@ export function AppSidebar() {
 							{favoriteApps.length > 0 && (
 								<>
 									<SidebarSeparator />
-									<SidebarGroup className='mt-4'>
+									<SidebarGroup className="mt-4">
 										<SidebarGroupLabel
 											className={cn(
 												'flex items-center gap-2 text-md text-text-primary',
@@ -409,7 +508,6 @@ export function AppSidebar() {
 										>
 											{!isCollapsed && 'Bookmarked'}
 											<Bookmark className="h-5 w-5 fill-yellow-500 text-yellow-500" />
-											
 										</SidebarGroupLabel>
 										<SidebarGroupContent>
 											<SidebarMenu>
@@ -417,11 +515,17 @@ export function AppSidebar() {
 													<AppMenuItem
 														key={app.id}
 														app={app}
-														onClick={(id) =>
+														// onClick={(id) =>
+														// 	navigate(
+														// 		`/app/${id}`,
+														// 	)
+														// }
+														onClick={(id) => {
+															setActiveAppId(id); // 👈 Store the active app ID
 															navigate(
 																`/app/${id}`,
-															)
-														}
+															);
+														}}
 														showActions={true}
 														isCollapsed={
 															isCollapsed
@@ -429,6 +533,12 @@ export function AppSidebar() {
 														getVisibilityIcon={
 															getVisibilityIcon
 														}
+														className={`${
+															activeAppId ===
+															app.id
+																? 'bg-green-500/20 hover:bg-green-500/30'
+																: 'hover:bg-green-100'
+														} rounded-md`}
 													/>
 												))}
 											</SidebarMenu>
