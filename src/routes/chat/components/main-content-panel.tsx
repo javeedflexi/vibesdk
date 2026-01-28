@@ -13,10 +13,15 @@ import { PreviewHeaderActions } from './preview-header-actions';
 import { EditorHeaderActions } from './editor-header-actions';
 import { Copy } from './copy';
 import { featureRegistry } from '@/features';
-import type { FileType, BlueprintType, BehaviorType, ModelConfigsInfo, TemplateDetails, ProjectType } from '@/api-types';
+import type { FileType, BlueprintType, PhasicBlueprint, BehaviorType, ModelConfigsInfo, TemplateDetails, ProjectType } from '@/api-types';
 import type { ContentDetectionResult } from '../utils/content-detector';
 import type { GitHubExportHook } from '@/hooks/use-github-export';
 import type { Edit } from '../hooks/use-chat';
+
+// Type guard to check if a blueprint is PhasicBlueprint
+function isPhasicBlueprint(blueprint: BlueprintType | undefined | null): blueprint is PhasicBlueprint {
+	return blueprint !== undefined && blueprint !== null && 'implementationRoadmap' in blueprint;
+}
 
 interface MainContentPanelProps {
 	// View state
@@ -42,6 +47,7 @@ interface MainContentPanelProps {
 	// Editor state
 	activeFile?: FileType;
 	allFiles: FileType[];
+	bootstrapFiles?: FileType[];
 	edit?: Edit | null;
 	onFileClick: (file: FileType) => void;
 
@@ -87,6 +93,7 @@ export function MainContentPanel(props: MainContentPanelProps) {
 		blueprint,
 		activeFile,
 		allFiles,
+		bootstrapFiles = [],
 		edit,
 		onFileClick,
 		isGenerating,
@@ -287,10 +294,12 @@ export function MainContentPanel(props: MainContentPanelProps) {
 			</div>,
 			<div className="flex-1 overflow-y-auto bg-bg-3">
 				<div className="py-12 mx-auto">
-					<Blueprint
-						blueprint={blueprint ?? ({} as BlueprintType)}
-						className="w-full max-w-2xl mx-auto"
-					/>
+					{isPhasicBlueprint(blueprint) && (
+						<Blueprint
+							blueprint={blueprint}
+							className="w-full max-w-2xl mx-auto"
+						/>
+					)}
 				</div>
 			</div>
 		);
@@ -306,6 +315,7 @@ export function MainContentPanel(props: MainContentPanelProps) {
 					<div className="absolute inset-0 flex" ref={editorRef}>
 						<FileExplorer
 							files={allFiles}
+							bootstrapFiles={bootstrapFiles}
 							currentFile={undefined}
 							onFileClick={onFileClick}
 						/>
@@ -335,6 +345,7 @@ export function MainContentPanel(props: MainContentPanelProps) {
 				<div className="absolute inset-0 flex" ref={editorRef}>
 					<FileExplorer
 						files={allFiles}
+						bootstrapFiles={bootstrapFiles}
 						currentFile={activeFile}
 						onFileClick={onFileClick}
 					/>

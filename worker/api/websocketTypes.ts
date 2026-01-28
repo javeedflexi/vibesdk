@@ -89,6 +89,7 @@ export type DeploymentStartedMessage = {
 export type DeploymentFailedMessage = {
 	type: 'deployment_failed';
 	error: string;
+	message?: string;
 };
 
 export type DeploymentCompletedMessage = {
@@ -128,6 +129,7 @@ type CodeReviewingMessage = {
 	message: string;
 	staticAnalysis?: StaticAnalysisResponse;
 	runtimeErrors: RuntimeError[];
+	clientErrors?: unknown[];
 };
 
 type CodeReviewedMessage = {

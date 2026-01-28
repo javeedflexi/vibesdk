@@ -135,17 +135,68 @@ export type {
 } from 'worker/database/types';
 
 // Agent/Generator Types
-export type { 
+export type {
   Blueprint as BlueprintType,
+  PhasicBlueprint,
+  AgenticBlueprint,
   ClientReportedErrorType,
   CodeReviewOutputType,
   FileConceptType,
   FileOutputType as GeneratedFile,
 } from 'worker/agents/schemas';
 
-export type { 
-  CodeGenState 
+export type {
+  CodeGenState,
+  BaseProjectState,
+  PhasicState,
+  AgenticState,
 } from 'worker/agents/core/state';
+
+export type {
+  BehaviorType,
+  ProjectType,
+} from 'worker/agents/core/types';
+
+export type {
+  ViewMode,
+  ViewDefinition,
+  FeatureDefinition,
+  PlatformCapabilities,
+} from 'worker/agents/core/features/types';
+
+export {
+  DEFAULT_FEATURE_DEFINITIONS,
+} from 'worker/agents/core/features/types';
+
+export type {
+  TemplateDetails,
+} from 'worker/services/sandbox/sandboxTypes';
+
+export type {
+  ModelConfigsInfo,
+  AgentDisplayConfig,
+} from 'worker/api/websocketTypes';
+
+import type {
+  VaultConfigResponse,
+  VaultStatusResponse,
+} from 'worker/services/secrets/vault-types';
+
+export type {
+  KdfAlgorithm,
+  SecretMetadata,
+  VaultConfigResponse,
+  VaultStatusResponse,
+} from 'worker/services/secrets/vault-types';
+
+// Vault API Response types
+export type VaultStatusData = VaultStatusResponse;
+export type VaultConfigData = { config: VaultConfigResponse };
+export type VaultSetupData = { success: boolean; message?: string };
+
+export type {
+  GitCloneTokenData,
+} from 'worker/api/controllers/appView/types';
 
 export type { 
   RuntimeError,

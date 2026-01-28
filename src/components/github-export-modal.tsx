@@ -31,6 +31,9 @@ interface GitHubExportModalProps {
         error?: string;
     };
     onRetry?: () => void;
+    existingGithubUrl?: string | null;
+    agentId?: string;
+    appTitle?: string;
 }
 
 export function GitHubExportModal({
@@ -40,7 +43,10 @@ export function GitHubExportModal({
     isExporting = false,
     exportProgress,
     exportResult,
-    onRetry
+    onRetry,
+    existingGithubUrl: _existingGithubUrl,
+    agentId: _agentId,
+    appTitle: _appTitle
 }: GitHubExportModalProps) {
     const [repositoryName, setRepositoryName] = useState('');
     const [description, setDescription] = useState('');

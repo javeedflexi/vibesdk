@@ -1,4 +1,4 @@
-import type { BlueprintType } from '@/api-types';
+import type { PhasicBlueprint } from '@/api-types';
 import clsx from 'clsx';
 import { Markdown } from './messages';
 
@@ -7,7 +7,7 @@ export function Blueprint({
 	className,
 	...props
 }: React.ComponentProps<'div'> & {
-	blueprint: BlueprintType;
+	blueprint: PhasicBlueprint;
 }) {
 	if (!blueprint) return null;
 

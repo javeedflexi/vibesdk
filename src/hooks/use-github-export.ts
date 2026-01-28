@@ -25,7 +25,7 @@ export interface GitHubInstallationData {
     repositories?: string[];
 }
 
-export function useGitHubExport(_websocket?: WebSocket | null, agentId?: string): {
+export interface GitHubExportHook {
     isExporting: boolean;
     progress?: GitHubExportProgress;
     result?: GitHubExportResult;
@@ -36,7 +36,9 @@ export function useGitHubExport(_websocket?: WebSocket | null, agentId?: string)
     isAuthenticated: boolean;
     user: AuthUser | null;
     retry: () => void;
-} {
+}
+
+export function useGitHubExport(_websocket?: WebSocket | null, agentId?: string): GitHubExportHook {
     const { user, isAuthenticated } = useAuth();
     const [state, setState] = useState<GitHubExportState>({
         isExporting: false,

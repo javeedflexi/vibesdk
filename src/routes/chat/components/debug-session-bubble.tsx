@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronDown, AlertTriangle, ArrowDown, Loader } from 'lucide-react';
+import { Check, ChevronDown, AlertTriangle, ArrowDown, Loader, LoaderCircle } from 'lucide-react';
 import clsx from 'clsx';
 import type { ChatMessage } from '../utils/message-helpers';
 import { formatElapsedTime } from '../hooks/use-debug-session';
-import { MessageContentRenderer, ToolStatusIndicator } from './messages';
+import { Markdown } from './messages';
 
 interface DebugSessionBubbleProps {
 message: ChatMessage;
@@ -29,7 +29,7 @@ useEffect(() => {
 if (autoScrollRef.current && scrollAreaRef.current) {
 scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
 }
-}, [message.content]);
+}, [message.message]);
 
 // Track scroll position
 const handleScroll = () => {
@@ -54,7 +54,7 @@ setShowScrollButton(false);
 }
 };
 
-const debugEvent = message.ui?.toolEvents?.find(e => e.name === 'deep_debug');
+const debugEvent = message.toolEvents?.find((e: { name: string }) => e.name === 'deep_debug');
 const hasError = debugEvent?.status === 'error';
 
 return (
@@ -146,21 +146,33 @@ className="max-h-[600px] overflow-y-auto px-4 py-3"
 >
 <div className="space-y-3">
 {/* Render message content */}
-<MessageContentRenderer 
-content={message.content || 'Initializing debug session...'}
-toolEvents={message.ui?.toolEvents?.filter(ev => ev.contentLength !== undefined) || []}
-/>
+<Markdown className="text-text-primary/80">
+{message.message || 'Initializing debug session...'}
+</Markdown>
 
 {/* Tool events */}
-{message.ui?.toolEvents && message.ui.toolEvents.length > 0 && (
+{message.toolEvents && message.toolEvents.length > 0 && (
 <div className="flex flex-col gap-1.5">
-{message.ui.toolEvents
-.filter(ev => ev.name !== 'deep_debug' && ev.contentLength === undefined)
-.map((event, idx) => (
-<ToolStatusIndicator 
+{message.toolEvents
+.filter((ev: { name: string }) => ev.name !== 'deep_debug')
+.map((event: { name: string; status: string; timestamp: number }, idx: number) => (
+<div
 key={`${event.name}-${event.timestamp}-${idx}`}
-event={event}
-/>
+className="flex items-center gap-1.5 text-xs text-text-tertiary"
+>
+{event.status === 'start' && (
+<LoaderCircle className="size-3 animate-spin" />
+)}
+{event.status === 'success' && <Check className="size-3" />}
+{event.status === 'error' && <AlertTriangle className="size-3" />}
+<span className="font-mono tracking-tight">
+{event.status === 'start' && 'Running'}
+{event.status === 'success' && 'Completed'}
+{event.status === 'error' && 'Error'}
+{' '}
+{event.name}
+</span>
+</div>
 ))}
 </div>
 )}

@@ -14,6 +14,7 @@ import type {
 	AppDeleteData,
 	AppDetailsData,
 	AppStarToggleData,
+	GitCloneTokenData,
 	UserAppsData,
 	ProfileUpdateData,
 	UserStatsData,
@@ -41,6 +42,10 @@ import type {
 	SecretStoreData,
 	SecretDeleteData,
 	SecretTemplatesData,
+	VaultStatusData,
+	VaultConfigData,
+	VaultSetupData,
+	KdfAlgorithm,
 	AgentConnectionData,
 	AgentStreamingResponse,
 	App,
@@ -56,6 +61,7 @@ import type {
 	CodeGenArgs,
 	AgentPreviewResponse,
 	PlatformStatusData,
+	PlatformCapabilities,
 } from '@/api-types';
 import {
 	RateLimitExceededError,
@@ -443,6 +449,13 @@ class ApiClient {
 		);
 	}
 
+	/**
+	 * Get platform capabilities for feature discovery
+	 */
+	async getCapabilities(): Promise<ApiResponse<PlatformCapabilities>> {
+		return this.request<PlatformCapabilities>('/api/capabilities');
+	}
+
 	// ===============================
 	// Apps API Methods
 	// ===============================
@@ -555,6 +568,17 @@ class ApiClient {
 		appId: string,
 	): Promise<ApiResponse<AppStarToggleData>> {
 		return this.request<AppStarToggleData>(`/api/apps/${appId}/star`, {
+			method: 'POST',
+		});
+	}
+
+	/**
+	 * Generate git clone token for private repository
+	 */
+	async generateGitCloneToken(
+		appId: string,
+	): Promise<ApiResponse<GitCloneTokenData>> {
+		return this.request<GitCloneTokenData>(`/api/apps/${appId}/git/token`, {
 			method: 'POST',
 		});
 	}
@@ -951,6 +975,57 @@ class ApiClient {
 	async getSecretTemplates(): Promise<ApiResponse<SecretTemplatesData>> {
 		return this.request<SecretTemplatesData>('/api/secrets/templates');
 	}
+
+	// ===============================
+	// Vault API Methods
+	// ===============================
+
+	/**
+	 * Get vault status
+	 */
+	async getVaultStatus(): Promise<ApiResponse<VaultStatusData>> {
+		return this.request<VaultStatusData>('/api/vault/status');
+	}
+
+	/**
+	 * Get vault configuration
+	 */
+	async getVaultConfig(): Promise<ApiResponse<VaultConfigData>> {
+		return this.request<VaultConfigData>('/api/vault/config');
+	}
+
+	/**
+	 * Setup vault with master password
+	 */
+	async setupVault(data: {
+		kdfAlgorithm: KdfAlgorithm;
+		kdfSalt: string;
+		kdfParams?: { time: number; mem: number; parallelism: number };
+		prfCredentialId?: string;
+		prfSalt?: string;
+		encryptedRecoveryCodes?: string;
+		recoveryCodesNonce?: string;
+		verificationBlob: string;
+		verificationNonce: string;
+	}): Promise<ApiResponse<VaultSetupData>> {
+		return this.request<VaultSetupData>('/api/vault/setup', {
+			method: 'POST',
+			body: data,
+		});
+	}
+
+	/**
+	 * Reset vault (deletes all secrets)
+	 */
+	async resetVault(): Promise<ApiResponse<{ success: boolean }>> {
+		return this.request<{ success: boolean }>('/api/vault/reset', {
+			method: 'POST',
+		});
+	}
+
+	// ===============================
+	// GitHub Integration Methods
+	// ===============================
 
 	/**
 	 * Initiate GitHub OAuth authorization for user repository access

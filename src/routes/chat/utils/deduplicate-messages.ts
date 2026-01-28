@@ -21,21 +21,21 @@ export function deduplicateMessages(messages: readonly ChatMessage[]): ChatMessa
     let lastAssistantContent: string | null = null;
     
     for (const msg of messages) {
-        if (msg.role !== 'assistant') {
+        if (msg.type !== 'ai') {
             // Keep all non-assistant messages (user, tool, etc.)
             result.push(msg);
             continue;
         }
-        
+
         // For assistant messages, check against last assistant content
-        if (lastAssistantContent !== null && msg.content === lastAssistantContent) {
+        if (lastAssistantContent !== null && msg.message === lastAssistantContent) {
             // Skip this duplicate
             continue;
         }
-        
+
         // Not a duplicate - keep it and update last content
         result.push(msg);
-        lastAssistantContent = msg.content;
+        lastAssistantContent = msg.message;
     }
     
     return result;
@@ -55,8 +55,8 @@ export function isAssistantMessageDuplicate(
 ): boolean {
     // Find the last assistant message
     for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === 'assistant') {
-            return messages[i].content === newContent;
+        if (messages[i].type === 'ai') {
+            return messages[i].message === newContent;
         }
     }
     return false; // No previous assistant message found

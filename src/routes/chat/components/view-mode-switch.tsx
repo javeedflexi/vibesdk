@@ -1,17 +1,24 @@
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Eye, Code } from 'lucide-react';
+import type { ProjectType } from '@/api-types';
 
 export function ViewModeSwitch({
 	view,
 	onChange,
 	previewAvailable = false,
 	showTooltip = false,
+	hasDocumentation: _hasDocumentation,
+	previewUrl: _previewUrl,
+	projectType: _projectType,
 }: {
-	view: 'preview' | 'editor' | 'blueprint'
-	onChange: (mode: 'preview' | 'editor' | 'blueprint') => void;
+	view: 'preview' | 'editor' | 'blueprint' | 'docs' | 'presentation';
+	onChange: (mode: 'preview' | 'editor' | 'blueprint' | 'docs' | 'presentation') => void;
 	previewAvailable: boolean;
 	showTooltip: boolean;
+	hasDocumentation?: boolean;
+	previewUrl?: string;
+	projectType?: ProjectType;
 }) {
 	if (!previewAvailable) {
 		return null;

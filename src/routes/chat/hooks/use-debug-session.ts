@@ -22,7 +22,7 @@ export function useDebugSession(
 	// Find the message containing deep_debug tool event
 	const debugMessage = useMemo(() => {
 		return messages.find(msg =>
-			msg.ui?.toolEvents?.some(event => event.name === 'deep_debug')
+			msg.toolEvents?.some((event: { name: string }) => event.name === 'deep_debug')
 		);
 	}, [messages]);
 
@@ -30,11 +30,11 @@ export function useDebugSession(
 	const debugInfo = useMemo(() => {
 		if (!debugMessage) return null;
 
-		const debugEvent = debugMessage.ui?.toolEvents?.find(e => e.name === 'deep_debug');
+		const debugEvent = debugMessage.toolEvents?.find((e: { name: string }) => e.name === 'deep_debug');
 		if (!debugEvent) return null;
 
-		const toolCallCount = debugMessage.ui?.toolEvents?.filter(
-			e => e.name !== 'deep_debug'
+		const toolCallCount = debugMessage.toolEvents?.filter(
+			(e: { name: string }) => e.name !== 'deep_debug'
 		).length || 0;
 
 		return {

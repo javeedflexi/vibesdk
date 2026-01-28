@@ -21,7 +21,7 @@ import { ViewModeSwitch } from './components/view-mode-switch';
 import { DebugPanel, type DebugMessage } from './components/debug-panel';
 import { DeploymentControls } from './components/deployment-controls';
 import { useChat, type FileType } from './hooks/use-chat';
-import { type BlueprintType, SUPPORTED_IMAGE_MIME_TYPES } from '@/api-types';
+import { type BlueprintType, type PhasicBlueprint, SUPPORTED_IMAGE_MIME_TYPES } from '@/api-types';
 import { Copy } from './components/copy';
 import { useFileContentStream } from './hooks/use-file-content-stream';
 import { logger } from '@/utils/logger';
@@ -34,6 +34,11 @@ import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useImageUpload } from '@/hooks/use-image-upload';
 import { useDragDrop } from '@/hooks/use-drag-drop';
 import { ImageAttachmentPreview } from '@/components/image-attachment-preview';
+
+// Type guard to check if a blueprint is PhasicBlueprint
+function isPhasicBlueprint(blueprint: BlueprintType | undefined): blueprint is PhasicBlueprint {
+	return blueprint !== undefined && 'implementationRoadmap' in blueprint;
+}
 
 export default function Chat() {
 	const { chatId: urlChatId } = useParams();
@@ -145,7 +150,7 @@ export default function Chat() {
 
 	const [activeFilePath, setActiveFilePath] = useState<string>();
 	const [view, setView] = useState<
-		'editor' | 'preview' | 'blueprint' | 'terminal'
+		'editor' | 'preview' | 'blueprint' | 'terminal' | 'docs' | 'presentation'
 	>('editor');
 
 	// Terminal state
@@ -238,7 +243,7 @@ export default function Chat() {
 	}, []);
 
 	const handleViewModeChange = useCallback(
-		(mode: 'preview' | 'editor' | 'blueprint') => {
+		(mode: 'preview' | 'editor' | 'blueprint' | 'docs' | 'presentation' | 'terminal') => {
 			setView(mode);
 		},
 		[],
@@ -490,7 +495,7 @@ export default function Chat() {
 
 		// Get predicted phase count from blueprint, fallback to current phase count
 		const predictedPhaseCount =
-			blueprint?.implementationRoadmap?.length || 0;
+			isPhasicBlueprint(blueprint) ? blueprint.implementationRoadmap?.length || 0 : 0;
 		const totalPhases = Math.max(
 			predictedPhaseCount,
 			phaseTimeline.length,
@@ -498,7 +503,7 @@ export default function Chat() {
 		);
 
 		return [completedPhases, totalPhases];
-	}, [phaseTimeline, blueprint?.implementationRoadmap]);
+	}, [phaseTimeline, blueprint]);
 
 	if (import.meta.env.DEV) {
 		logger.debug({
@@ -905,13 +910,12 @@ export default function Chat() {
 									</div>
 									<div className="flex-1 overflow-y-auto bg-bg-3">
 										<div className="py-12 mx-auto">
-											<Blueprint
-												blueprint={
-													blueprint ??
-													({} as BlueprintType)
-												}
-												className="w-full max-w-2xl mx-auto"
-											/>
+											{isPhasicBlueprint(blueprint) && (
+												<Blueprint
+													blueprint={blueprint}
+													className="w-full max-w-2xl mx-auto"
+												/>
+											)}
 										</div>
 									</div>
 								</div>

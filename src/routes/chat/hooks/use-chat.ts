@@ -33,6 +33,9 @@ export interface FileType {
 	language?: string;
 }
 
+// Edit type for code fixes
+export type Edit = Omit<CodeFixEdits, 'type'>;
+
 // New interface for phase timeline tracking
 export interface PhaseTimelineItem {
 	id: string;

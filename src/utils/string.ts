@@ -31,3 +31,10 @@ export const formatFileSize = (bytes?: number) => {
 	}
 	return `${size.toFixed(1)} ${units[unitIndex]}`;
 };
+
+export const normalizeAppTitle = (title: string): string => {
+	return title
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+};
