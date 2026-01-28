@@ -140,13 +140,13 @@
 	],
 	"routes": [
         {
-            "pattern": "build.cloudflare.dev",
+            "pattern": "newbuild.flexifunnels.com",
             "custom_domain": true
         },
         {
-            "pattern": "*build-preview.cloudflare.dev/*",
+            "pattern": "*newbuild.flexifunnels.com/*",
             "custom_domain": false,
-            "zone_id": "db01fac4261b2604aacad8410443a3e2"
+            "zone_id": "71ab70616b93164c24a06fd3c5df67ac"
         }
     ],
 	"vars": {
