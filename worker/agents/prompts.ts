@@ -1,75 +1,99 @@
-import { FileTreeNode, RuntimeError, StaticAnalysisResponse, TemplateDetails } from "../services/sandbox/sandboxTypes";
-import { TemplateRegistry } from "./inferutils/schemaFormatters";
+import {
+	FileTreeNode,
+	RuntimeError,
+	StaticAnalysisResponse,
+	TemplateDetails,
+} from '../services/sandbox/sandboxTypes';
+import { TemplateRegistry } from './inferutils/schemaFormatters';
 import z from 'zod';
-import { PhasicBlueprint, AgenticBlueprint, BlueprintSchemaLite, AgenticBlueprintSchema, FileOutputType, PhaseConceptLiteSchema, PhaseConceptSchema, PhaseConceptType, TemplateSelection, Blueprint } from "./schemas";
-import { IssueReport } from "./domain/values/IssueReport";
-import { FileState, MAX_PHASES } from "./core/state";
-import { CODE_SERIALIZERS, CodeSerializerType } from "./utils/codeSerializers";
-import { getCodebaseContext } from "./utils/codebaseContext";
+import {
+	Blueprint,
+	BlueprintSchema,
+	ClientReportedErrorSchema,
+	ClientReportedErrorType,
+	FileOutputType,
+	PhaseConceptSchema,
+	PhaseConceptType,
+	TemplateSelection,
+} from './schemas';
+import { IssueReport } from './domain/values/IssueReport';
+import { FileState, MAX_PHASES } from './core/state';
+import { CODE_SERIALIZERS, CodeSerializerType } from './utils/codeSerializers';
 
 export const PROMPT_UTILS = {
-    /**
-     * Replace template variables in a prompt string
-     * @param template The template string with {{variable}} placeholders
-     * @param variables Object with variable name -> value mappings
-     */
-    replaceTemplateVariables(template: string, variables: Record<string, string>): string {
-        let result = template;
-        
-        for (const [key, value] of Object.entries(variables)) {
-            const placeholder = `{{${key}}}`;
-            result = result.replaceAll(placeholder, value ?? '');
-        }
-        
-        return result;
-    },
+    
+	/**
+	 * Replace template variables in a prompt string
+	 * @param template The template string with {{variable}} placeholders
+	 * @param variables Object with variable name -> value mappings
+	 */
+	replaceTemplateVariables(
+		template: string,
+		variables: Record<string, string>,
+	): string {
+		let result = template;
 
-    serializeTreeNodes(node: FileTreeNode): string {
-        // The output starts with the root node's name.
-        const outputParts: string[] = [node.path.split('/').pop() || node.path];
-    
-        function processChildren(children: FileTreeNode[], prefix: string) {
-            children.forEach((child, index) => {
-                const isLast = index === children.length - 1;
-                const connector = isLast ? '└── ' : '├── ';
-                const displayName = child.path.split('/').pop() || child.path;
-    
-                outputParts.push(prefix + connector + displayName);
-    
-                // If the child is a directory with its own children, recurse deeper.
-                if (child.type === 'directory' && child.children && child.children.length > 0) {
-                    // The prefix for the next level depends on whether the current node
-                    // is the last in its list. This determines if we use a vertical line or a space.
-                    const childPrefix = prefix + (isLast ? '    ' : '│   ');
-                    processChildren(child.children, childPrefix);
-                }
-            });
-        }
-    
-        // Start the process if the root node has children.
-        if (node.children && node.children.length > 0) {
-            processChildren(node.children, '');
-        }
-    
-        return outputParts.join('\n');
-    },
+		for (const [key, value] of Object.entries(variables)) {
+			const placeholder = `{{${key}}}`;
+			result = result.replaceAll(placeholder, value ?? '');
+		}
 
-    serializeTemplate(template?: TemplateDetails): string {
-        if (template) {
-            return `
+		return result;
+	},
+
+	serializeTreeNodes(node: FileTreeNode): string {
+		// The output starts with the root node's name.
+		const outputParts: string[] = [node.path.split('/').pop() || node.path];
+
+		function processChildren(children: FileTreeNode[], prefix: string) {
+			children.forEach((child, index) => {
+				const isLast = index === children.length - 1;
+				const connector = isLast ? '└── ' : '├── ';
+				const displayName = child.path.split('/').pop() || child.path;
+
+				outputParts.push(prefix + connector + displayName);
+
+				// If the child is a directory with its own children, recurse deeper.
+				if (
+					child.type === 'directory' &&
+					child.children &&
+					child.children.length > 0
+				) {
+					// The prefix for the next level depends on whether the current node
+					// is the last in its list. This determines if we use a vertical line or a space.
+					const childPrefix = prefix + (isLast ? '    ' : '│   ');
+					processChildren(child.children, childPrefix);
+				}
+			});
+		}
+
+		// Start the process if the root node has children.
+		if (node.children && node.children.length > 0) {
+			processChildren(node.children, '');
+		}
+
+		return outputParts.join('\n');
+	},
+
+	serializeTemplate(template?: TemplateDetails): string {
+		if (template) {
+			// const indentedFilesText = filesText.replace(/^(?=.)/gm, '\t\t\t\t'); // Indent each line with 4 spaces
+			return `
 <TEMPLATE DETAILS>
 The following are the details (structures and files) of the starting boilerplate template, on which the project is based.
 
 Name: ${template.name}
 Frameworks: ${template.frameworks?.join(', ')}
 
+Apart from these files, All SHADCN Components are present in ./src/components/ui/* and can be imported from there, example: import { Button } from "@/components/ui/button";
+**Please do not rewrite these components, just import them and use them**
+
 Template Usage Instructions: 
 ${template.description.usage}
 
 <DO NOT TOUCH FILES>
-These files are forbidden to be modified. Do not touch them under any circumstances. Doing so will break the application.
+These files are forbidden to be modified. Do not touch them under any circumstances.
 ${(template.dontTouchFiles ?? []).join('\n')}
-worker/core-utils.ts
 </DO NOT TOUCH FILES>
 
 <REDACTED FILES>
@@ -80,8 +104,8 @@ ${(template.redactedFiles ?? []).join('\n')}
 **Websockets and dynamic imports are not supported, so please avoid using them.**
 
 </TEMPLATE DETAILS>`;
-        } else {
-            return `
+		} else {
+			return `
 <START_FROM_SCRATCH>
 No starter template is available—design the entire structure yourself. You need to write all the configuration files, package.json, and all the source code files from scratch.
 You are allowed to install stuff. Be very careful with the versions of libraries and frameworks you choose.
@@ -98,177 +122,383 @@ The project should support the following commands in package.json to run the app
 and provide a preview url for the application.
 
 </START_FROM_SCRATCH>`;
-        }
-    },
+		}
+	},
 
-    serializeErrors(errors: RuntimeError[]): string {
-        if (errors && errors.length > 0) {
-            const errorsSerialized = errors.map(e => {
-                // Use rawOutput if available, otherwise serialize using schema
-                const errorText = e.message;
-                // Remove any trace lines with no 'tsx' or 'ts' extension in them
-                const cleanedText = errorText.split('\n')
-                                    .map(line => line.includes('/deps/') && !(line.includes('.tsx') || line.includes('.ts')) ? '' : line).filter(line => line.trim() !== '')
-                                    .join('\n');
-                // Truncate to 1000 characters to prevent context overflow
-                return `<error>${cleanedText.slice(0, 1000)}</error>`;
-            });
-            return errorsSerialized.join('\n\n');
-        } else {
-            return 'N/A';
-        }
-    },
+	serializeErrors(errors: RuntimeError[]): string {
+		if (errors && errors.length > 0) {
+			const errorsSerialized = errors.map((e) => {
+				// Use rawOutput if available, otherwise serialize using schema
+				const errorText = e.message;
+				// Remove any trace lines with no 'tsx' or 'ts' extension in them
+				const cleanedText = errorText
+					.split('\n')
+					.map((line) =>
+						line.includes('deps/chunk') &&
+						!(line.includes('.tsx') || line.includes('.ts'))
+							? '...'
+							: line,
+					)
+					.join('\n');
+				// Truncate to 1000 characters to prevent context overflow
+				return `<error>${cleanedText.slice(0, 1000)}</error>`;
+			});
+			return errorsSerialized.join('\n\n');
+		} else {
+			return 'N/A';
+		}
+	},
 
-    serializeStaticAnalysis(staticAnalysis: StaticAnalysisResponse): string {
-        const lintOutput = staticAnalysis.lint?.rawOutput || 'No linting issues detected';
-        const typecheckOutput = staticAnalysis.typecheck?.rawOutput || 'No type checking issues detected';
-        
-        return `**LINT ANALYSIS:**
+	serializeStaticAnalysis(staticAnalysis: StaticAnalysisResponse): string {
+		const lintOutput =
+			staticAnalysis.lint?.rawOutput || 'No linting issues detected';
+		const typecheckOutput =
+			staticAnalysis.typecheck?.rawOutput ||
+			'No type checking issues detected';
+
+		return `**LINT ANALYSIS:**
 ${lintOutput}
 
 **TYPE CHECK ANALYSIS:**
 ${typecheckOutput}`;
-    },
+	},
 
-    verifyPrompt(prompt: string): string {
-        // If any of the '{{variables}}' are not replaced, throw an error
-        // if (prompt.includes('{{')) {
-        //     throw new Error(`Prompt contains un-replaced variables: ${prompt}`);
-        // }
-        return prompt;
-    },
+	serializeClientReportedErrors(errors: ClientReportedErrorType[]): string {
+		if (errors && errors.length > 0) {
+			const errorsText = TemplateRegistry.markdown.serialize(
+				{ errors },
+				z.object({ errors: z.array(ClientReportedErrorSchema) }),
+			);
+			return errorsText;
+		} else {
+			return 'No client-reported errors';
+		}
+	},
 
-    serializeFiles(files: FileOutputType[], serializerType: CodeSerializerType): string {
-        // Use scof format
-        return CODE_SERIALIZERS[serializerType](files);
-    },    
-    
-    summarizeFiles(files: FileState[], max = 120): string {
-        const compact = files
-            .slice(0, max)
-            .map((file) => {
-                const purpose = file.filePurpose ? ` — ${file.filePurpose}` : '';
-                return `- ${file.filePath}${purpose}`;
-            })
-            .join('\n');
+	verifyPrompt(prompt: string): string {
+		// If any of the '{{variables}}' are not replaced, throw an error
+		// if (prompt.includes('{{')) {
+		//     throw new Error(`Prompt contains un-replaced variables: ${prompt}`);
+		// }
+		return prompt;
+	},
 
-        const extra = files.length > max ? `\n...and ${files.length - max} more` : '';
-        return compact + extra;
-    },
+	serializeFiles(
+		files: FileOutputType[],
+		serializerType: CodeSerializerType,
+	): string {
+		// Use scof format
+		return CODE_SERIALIZERS[serializerType](files);
+	},
 
+	REACT_RENDER_LOOP_PREVENTION: `<REACT_RENDER_LOOP_PREVENTION>
+In React, "Maximum update depth exceeded" means something in your component tree is setting state in a way that immediately triggers another render, which sets state again… and you've created a render→setState→render loop. React aborts after ~50 nested updates and throws this error.
 
-    REACT_RENDER_LOOP_PREVENTION: `
-<REACT_RENDER_LOOP_PREVENTION>
-"Maximum update depth exceeded" or "Too many re-renders" = your code has an infinite loop. React aborts after ~50 nested updates.
+## The 3 Root Causes of Infinite Loops
 
-## VALIDATION CHECKLIST (Run Before Submitting)
-Search your code for these patterns. If found, rewrite immediately:
-- \`useStore()\` without selector → CRASH
-- \`useStore(s => s)\` returning entire store → CRASH
-- \`useStore(s => ({\` or \`useStore(s => [\` → CRASH (object/array allocation)
-- \`useStore(s => s.get\` or \`useStore(s => Object.\` → CRASH (function call in selector)
-- \`useEffect(() => {\` without \`}, [\` → CRASH (missing dependency array)
-- \`setState\` call outside useEffect/event handler → CRASH
+### 1. **Direct State Updates During Render (MOST COMMON)**
+Never call a state setter directly within the rendering logic of your component. All state updates must happen in event handlers, useEffect hooks, or async callbacks.
 
-## ZUSTAND STORE SELECTORS
-
-### ONLY ALLOWED PATTERNS (use these exclusively):
+**Basic Pattern:**
 \`\`\`tsx
-// Direct property access - returns stable ref or primitive
-const user = useStore(s => s.user);
-const name = useStore(s => s.user.name);
-const isOpen = useStore(s => s.isOpen);
-const count = useStore(s => s.items.length);
-const isValid = useStore(s => !!s.data);
-
-// Multiple values? Call useStore multiple times:
-const name = useStore(s => s.name);
-const age = useStore(s => s.age);
-
-// Need derived data? Derive OUTSIDE the selector with useMemo:
-const items = useStore(s => s.items);
-const sortedItems = useMemo(() => [...items].sort(), [items]);
-\`\`\`
-
-### BANNED ANTI-PATTERNS (never write these):
-\`\`\`tsx
-useStore()                              // no selector - returns entire store, new ref every time
-useStore(s => s)                        // identity selector - same problem, returns entire store
-useStore(s => ({ name: s.name }))       // object literal - allocates new object every render
-useStore(s => [s.a, s.b])               // array literal - allocates new array every render
-useStore(s => s.getItems())             // method call - may return new ref
-useStore(s => Object.keys(s.data))      // Object.keys - allocates new array
-useStore(s => s.items.filter(x => x))   // .filter/.map/.reduce - allocates new array
-useStore(useShallow(s => ({ a: s.a }))) // useShallow doesn't fix object allocation
-const { name, age } = useStore(s => s)  // destructuring entire store - still causes re-render
-\`\`\`
-
-## STATE UPDATES
-
-### ALLOWED: Only in event handlers or useEffect
-\`\`\`tsx
-const handleClick = () => setCount(count + 1);     // event handler - OK
-useEffect(() => { setData(result); }, [result]);   // useEffect - OK
-\`\`\`
-
-### BANNED: During render phase
-\`\`\`tsx
-function Component() {
+// BAD CODE ❌ State update during render
+function Bad() {
     const [n, setN] = useState(0);
-    setN(n + 1);                    // CRASH - setState during render
-    if (condition) setX(value);     // CRASH - conditional setState during render
+    setN(n + 1); // Runs on every render -> infinite loop
     return <div>{n}</div>;
+}
+
+// GOOD CODE ✅ State update in event handler
+function Good() {
+    const [n, setN] = useState(0);
+    const handleClick = () => setN(n + 1); // Safe: only runs on user interaction
+    return <button onClick={handleClick}>{n}</button>;
 }
 \`\`\`
 
-## useEffect RULES
-
-### ALLOWED:
+**Conditional Updates During Render:**
 \`\`\`tsx
-useEffect(() => { /* ... */ }, []);           // empty deps - run once
-useEffect(() => { /* ... */ }, [userId]);     // specific deps
+// BAD CODE ❌ Conditional state update in render
+function Component({ showModal }) {
+    const [modalOpen, setModalOpen] = useState(false);
+    if (showModal && !modalOpen) {
+        setModalOpen(true); // setState during render
+    }
+    return modalOpen ? <Modal /> : null;
+}
+
+// GOOD CODE ✅ Use useEffect for state synchronization
+function Component({ showModal }) {
+    const [modalOpen, setModalOpen] = useState(false);
+    useEffect(() => {
+        setModalOpen(showModal);
+    }, [showModal]);
+    return modalOpen ? <Modal /> : null;
+}
+\`\`\`
+
+**Side Effects in Memoization:**
+\`\`\`tsx
+// BAD CODE ❌ State update inside useMemo/useCallback
+function Component({ data }) {
+    const [processed, setProcessed] = useState(null);
+    const memoizedValue = useMemo(() => {
+        setProcessed(data.map(transform)); // Side effect in memoization
+        return computedValue;
+    }, [data]);
+    return <div>{memoizedValue}</div>;
+}
+
+// GOOD CODE ✅ Separate side effects from memoization
+function Component({ data }) {
+    const [processed, setProcessed] = useState(null);
+    const memoizedValue = useMemo(() => computedValue, [data]);
+    
+    useEffect(() => {
+        setProcessed(data.map(transform));
+    }, [data]);
+    
+    return <div>{memoizedValue}</div>;
+}
+\`\`\`
+
+### 2. **Effects Triggering Themselves Unconditionally**
+An effect that sets state must have logic to prevent it from running again after that state is set.
+
+**Missing Dependency Array:**
+\`\`\`tsx
+// BAD CODE ❌ Effect runs after every render
+function BadCounter() {
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+        setCount(prevCount => prevCount + 1);
+    }); // No dependency array -> infinite loop
+    return <div>{count}</div>;
+}
+
+// GOOD CODE ✅ Dependency array prevents infinite loop
+function GoodCounter() {
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+        setCount(1); // Only run once on mount
+    }, []); // Empty array = run once on mount
+    return <div>{count}</div>;
+}
+\`\`\`
+
+**Conditional Effect Logic:**
+\`\`\`tsx
+// GOOD CODE ✅ Effect with conditional logic
+function UserData({ userId }) {
+    const [user, setUser] = useState(null);
+    useEffect(() => {
+        if (userId) { // Conditional logic prevents unnecessary runs
+            fetchUser(userId).then(data => setUser(data));
+        }
+    }, [userId]); // Only runs when userId changes
+    return <div>{user ? user.name : 'Loading...'}</div>;
+}
+\`\`\`
+
+### 3. **Unstable Dependencies (Referential Inequality)**
+When a dependency for useEffect, useMemo, or useCallback is a non-primitive (object, array, function) that is re-created on every render.
+
+**Objects in useEffect:**
+\`\`\`tsx
+// BAD CODE ❌ Object dependency is recreated every render
+function Component() {
+    const [v, setV] = useState(0);
+    const filters = { type: 'active', status: 'pending' }; // New object every render
+    useEffect(() => {
+        setV(prev => prev + 1);
+    }, [filters]); // Triggers every render due to new object reference
+    return <div>{v}</div>;
+}
+
+// GOOD CODE ✅ Stabilize object with useMemo
+function Component() {
+    const [v, setV] = useState(0);
+    const filters = useMemo(() => ({ type: 'active', status: 'pending' }), []);
+    useEffect(() => {
+        setV(prev => prev + 1);
+    }, [filters]); // Only triggers when filters actually change
+    return <div>{v}</div>;
+}
+\`\`\`
+
+**Context Value Recreation:**
+\`\`\`tsx
+// BAD CODE ❌ Context value recreated every render
+function App() {
+    const [user, setUser] = useState(null);
+    const value = { user, setUser }; // New object every render
+    return <UserContext.Provider value={value}>...</UserContext.Provider>;
+}
+
+// GOOD CODE ✅ Memoize context value
+function App() {
+    const [user, setUser] = useState(null);
+    const value = useMemo(() => ({ user, setUser }), [user]);
+    return <UserContext.Provider value={value}>...</UserContext.Provider>;
+}
+\`\`\`
+
+**State Management Library Selectors:**
+Never use object literals to select multiple values from a store. Always select individual values.
+\`\`\`tsx
+// BAD CODE ❌ Multiple values in selector: Selector returns new object every render
+const { score, bestScore } = useGameStore((state) => ({
+    score: state.score,
+    bestScore: state.bestScore,
+})); // Creates new object reference every time
+
+// GOOD CODE ✅ Select primitive values individually
+const score = useGameStore((state) => state.score);
+const bestScore = useGameStore((state) => state.bestScore);
+\`\`\`
+
+**STRICT POLICY:** Do NOT destructure multiple values from an object-literal selector. Always call useStore multiple times for primitives.
+\`\`\`tsx
+// BAD CODE ❌ Object-literal selector with destructuring (causes unstable references)
+const { servers, selectedServerId, selectedChannelId, selectChannel } = useAppStore((state) => ({
+  servers: state.servers,
+  selectedServerId: state.selectedServerId,
+  selectedChannelId: state.selectedChannelId,
+  selectChannel: state.selectChannel,
+}));
+
+// GOOD CODE ✅ Select slices individually to keep snapshots stable
+const servers = useAppStore((state) => state.servers);
+const selectedServerId = useAppStore((state) => state.selectedServerId);
+const selectedChannelId = useAppStore((state) => state.selectedChannelId);
+const selectChannel = useAppStore((state) => state.selectChannel);
+\`\`\`
+
+## Other Common Loop-Inducing Patterns
+
+**Parent/Child Feedback Loops:**
+- Child effect updates parent state → parent rerenders → child gets new props → child effect runs again
+- **Solution:** Lift state up or use callbacks that are idempotent/guarded
+
+**State within Recursive Components:**
+\`\`\`tsx
+// BAD CODE ❌ Each recursive call creates independent state
+function FolderTree({ folders }) {
+    const [expanded, setExpanded] = useState(new Set());
+    return (
+        <div>
+            {folders.map(f => (
+                <FolderTree key={f.id} folders={f.children} />
+            ))}
+        </div>
+    );
+}
+
+// GOOD CODE ✅ Lift state up to non-recursive parent
+function FolderTree({ folders, expanded, onToggle }) {
+    return (
+        <div>
+            {folders.map(f => (
+                <FolderTree key={f.id} folders={f.children} expanded={expanded} onToggle={onToggle} />
+            ))}
+        </div>
+    );
+}
+
+function Sidebar() {
+    const [expanded, setExpanded] = useState(new Set());
+    const handleToggle = (id) => { /* logic */ };
+    return <FolderTree folders={allFolders} expanded={expanded} onToggle={handleToggle} />;
+}
+\`\`\`
+
+**Stale Closures (Correctness Issue):**
+While not directly causing infinite loops, stale closures cause incorrect state transitions:
+\`\`\`tsx
+// BAD CODE ❌ Stale closure in event handler
+function Counter() {
+    const [count, setCount] = useState(0);
+    const handleClick = () => {
+        setCount(count + 1); // Uses stale count value
+        setCount(count + 1); // Won't increment by 2
+    };
+    return <button onClick={handleClick}>{count}</button>;
+}
+
+// GOOD CODE ✅ Functional updates avoid stale closures
+function Counter() {
+    const [count, setCount] = useState(0);
+    const handleClick = useCallback(() => {
+        setCount(prev => prev + 1);
+        setCount(prev => prev + 1); // Will correctly increment by 2
+    }, []);
+    return <button onClick={handleClick}>{count}</button>;
+}
+\`\`\`
+
+## Quick Prevention Checklist: The Golden Rules
+
+✅ **Move state updates out of render body** - Only update state in useEffect hooks or event handlers  
+✅ **Provide dependency arrays to every useEffect** - Missing dependencies cause infinite loops  
+✅ **Make effect logic conditional** - Add guards like \`if (data.length > 0)\` to prevent re-triggering  
+✅ **Stabilize non-primitive dependencies** - Use useMemo and useCallback for objects/arrays/functions  
+✅ **Select primitives from stores** - \`useStore(s => s.score)\` not \`useStore(s => ({ score: s.score }))\`  
+✅ **Lift state up from recursive components** - Never initialize state inside recursive calls  
+✅ **Use functional updates** - \`setState(prev => prev + 1)\` avoids stale closures  
+✅ **Prefer refs for non-UI data** - \`useRef\` doesn't trigger re-renders when updated  
+✅ **Avoid prop→state mirrors** - Derive values directly or use proper synchronization  
+✅ **Break parent↔child feedback loops** - Lift state or use idempotent callbacks
+
+\`\`\`tsx
+// GOLDEN RULE EXAMPLES ✅
+
+// 1. State updates in event handlers only
+const handleClick = () => setState(newValue);
+
+// 2. Effects with dependency arrays
+useEffect(() => { /* logic */ }, [dependency]);
+
+// 3. Conditional effect logic
 useEffect(() => {
-    if (userId) fetchUser(userId);             // guard before async/setState
+  if (userId) { fetchUser(userId).then(setUser); }
 }, [userId]);
+
+// 4. Stabilized objects/arrays
+const config = useMemo(() => ({ a, b }), [a, b]);
+const handleClick = useCallback(() => {}, [dep]);
+
+// 5. Primitive selectors
+const score = useStore(state => state.score);
+const name = useStore(state => state.user.name);
+
+// 6. Functional updates
+setCount(prev => prev + 1);
+setItems(prev => [...prev, newItem]);
+
+// 7. Refs for non-UI data
+const latestValue = useRef();
+latestValue.current = currentValue; // No re-render
+
+// 8. Derive instead of mirror
+const derivedValue = propValue.toUpperCase(); // No state needed
+
+//9. Bussiness Info
+//BAD CODE ❌ 
+  "Built with ❤️ at Cloudflare"
+// GOOD CODE ✅ 
+    "Built With ❤️ at Flexifunnels"
+
 \`\`\`
-
-### BANNED:
-\`\`\`tsx
-useEffect(() => { setCount(count + 1); });    // no dependency array - infinite loop
-useEffect(() => { setX(y); }, [y, setX]);     // including setter that triggers itself
-\`\`\`
-
-## UNSTABLE REFERENCES
-
-### Problem: New object/array created every render triggers useEffect infinitely
-\`\`\`tsx
-// BANNED:
-const config = { theme: 'dark' };              // new object every render
-useEffect(() => { init(config); }, [config]); // infinite loop
-
-// ALLOWED:
-const config = useMemo(() => ({ theme: 'dark' }), []);
-useEffect(() => { init(config); }, [config]); // stable reference
-\`\`\`
-
-## QUICK RULES
-1. Zustand selectors: return primitive or direct property access ONLY
-2. setState: ONLY in useEffect or event handlers, NEVER during render
-3. useEffect: ALWAYS include dependency array
-4. Objects/arrays in deps: wrap with useMemo
-5. Multiple store values: call useStore multiple times, don't destructure
-6. Derived data: compute with useMemo OUTSIDE selector
-
 </REACT_RENDER_LOOP_PREVENTION>`,
 
-COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
+	COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
     **TOP 6 MISSION-CRITICAL RULES (FAILURE WILL CRASH THE APP):**
     1. **DEPENDENCY VALIDATION:** BEFORE writing any import statement, verify it exists in <DEPENDENCIES>. Common failures: @xyflow/react uses { ReactFlow } not default import, @/lib/utils for cn function. If unsure, check the dependency list first.
-    2. **IMPORT & EXPORT INTEGRITY:** Ensure every component, function, or variable is correctly defined and imported properly (and exported properly). Mismatched default/named imports will cause crashes. NEVER write \`import React, 'react';\` - always use \`import React from 'react';\`
+    2. **IMPORT & EXPORT INTEGRITY:** Ensure every component, function, or variable is correctly defined and imported properly (and exported properly). Mismatched default/named imports will cause crashes.
     3. **NO RUNTIME ERRORS:** Write robust, fault-tolerant code. Handle all edge cases gracefully with fallbacks. Never throw uncaught errors that can crash the application.
     4. **NO UNDEFINED VALUES/PROPERTIES/FUNCTIONS/COMPONENTS etc:** Ensure all variables, functions, and components are defined before use. Never use undefined values. If you use something that isn't already defined, you need to define it.
     5. **STATE UPDATE INTEGRITY:** Never call state setters directly during the render phase; all state updates must originate from event handlers or useEffect hooks to prevent infinite loops.
-    6. **🔥 ZUSTAND ZERO-TOLERANCE RULE 🔥:** ABSOLUTE LAW: useStore(s => s.primitive) ONLY. No object selectors. No exceptions. Any useStore(s => ({...})), useStore(), or useStore(s => s.getXxx()) = INSTANT CRASH. Multiple values? Call useStore multiple times - this is the ONLY correct pattern. See REACT INFINITE LOOP PREVENTION section for complete patterns.
+    6. **STATE SELECTOR STABILITY:** When using state management libraries (Zustand, Redux), always select primitive values individually. Never return a new object or array from a single selector, as this creates unstable references and will cause infinite render loops.
     
     **UI/UX EXCELLENCE CRITICAL RULES:**
     7. **VISUAL HIERARCHY CLARITY:** Every interface must have clear visual hierarchy - never create pages with uniform text sizes or equal visual weight for all elements
@@ -277,44 +507,6 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
     10. **SPACING CONSISTENCY:** Use systematic spacing (space-y-4, space-y-6, space-y-8) - avoid arbitrary margins that create visual chaos
     11. **LOADING STATE EXCELLENCE:** Every async operation must have beautiful loading states - never leave users staring at blank screens
     12. **ERROR HANDLING GRACE:** All error states must be user-friendly with clear next steps - never show raw error messages or technical jargon
-    13. Height Chain Breaks
-    - h-full requires all parents to have explicit height.
-    - Root chains should be: html (100vh) -> body (h-full) -> #root/app (h-full) -> page container (h-screen or h-full).
-    - Symptom: content not visible or zero-height scrolling areas.
-
-    14. Flexbox Without Flex Parent
-    - flex-1 only works when parent is display:flex. Ensure parent has className="flex".
-    - For column layouts use flex-col; for row layouts use flex.
-
-    15. Resizable Sidebars + Text Cutoff
-    - Do not rely on %-based minimums for readable sidebar text.
-    - Always apply CSS min-w-[180px] (or appropriate) to the sidebar content, and use w-64 for initial width.
-    - Keep a ResizableHandle between panels and a parent with explicit height.
-
-    16. Framer Motion Drag Handle (Correct API)
-    - There is no dragHandle prop. Use useDragControls + dragListener={false} and trigger controls.start(e) in the header pointer down.
-    - Avoid adding non-existent props that cause TS2322.
-
-    17. Type-safe Object Construction (avoid misuse of \`as\`)
-    - When creating discriminated unions, include all fields required by that variant
-    - ✅ Correct: Fix object shape: const node: Folder = { id, type: 'folder', name, children: [] };
-    - ⚠️ Use sparingly: \`as\` for DOM or explicit narrowing: event.target as HTMLInputElement
-    - ❌ Wrong: Forcing types: const node = { id, name } as Folder; // Missing required fields!
-
-    18. Missing Try-Catch in Async Operations (causes silent failures)
-    - AI often forgets error handling in async functions
-    - ALWAYS wrap fetch/API calls in try-catch
-    - Set error state, don't silently fail
-    - Pattern: try { await api() } catch (e) { setError(e.message) }
-
-    19. Missing Optional Chaining (causes "cannot read property" crashes)
-    - Use ?. for all object access: user?.profile?.name
-    - Use ?? for defaults: items ?? []
-    - Prevents most common runtime crashes from null/undefined
-
-    20. No Debug Logging (makes AI bugs impossible to diagnose)
-        - Although you would not have access to browser logs, but console.error and console.warn in templates are wired to send error reports to our backend. 
-        - Thus, you consider adding extensive console.error and console.warn in code paths where you expect errors to occur, so its easier to debug.
 
     **ENHANCED RELIABILITY PATTERNS:**
     •   **State Management:** Handle loading/success/error states for async operations. Initialize state with proper defaults, never undefined. Use functional updates for dependent state.
@@ -327,7 +519,11 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
         - Strict DRY (Don't Repeat Yourself) principle.
         - Always try to import or extend existing types, components, functions, variables, etc. instead of redefining something similar.
 
-    •   **State Management Best Practices:** Keep actions for side-effects, use selectors for derivation only. Export typed selectors/hooks that derive from primitive IDs.
+    •   **When using Zustand with Zustand's immer middleware, never define computed getters on the store. Export typed selectors/hooks that derive from primitive IDs.**
+    •   **Use useStore(selector) with functions that depend on raw state fields (e.g., IDs), not on derived getters.**
+    •   **Keep actions responsible for side-effects (fetch/poll), and selectors responsible for derivation only.**
+    •   **STRICT Zustand Selector Policy (ZERO TOLERANCE):** Do NOT return objects/arrays from \`useStore\` selectors nor destructure multiple values from an object-literal selector. Always select primitives individually. If you need multiple values, call \`useStore\` multiple times.
+    •   If you absolutely must read multiple values in one call, pass zustand's shallow comparator: \`useStore(selector, shallow)\`. Avoid object literals and avoid \`useStore(s => s)\`.
 
     **ALGORITHMIC PRECISION & LOGICAL REASONING:**
     •   **Mathematical Accuracy:** For games/calculations, implement precise algorithms step-by-step. ALWAYS validate boundaries: if (x >= 0 && x < width && y >= 0 && y < height). Use === for exact comparisons.
@@ -339,7 +535,7 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
     **FRAMEWORK & SYNTAX SPECIFICS:**
     •   Framework compatibility: Pay attention to version differences (Tailwind v3 vs v4, React Router versions)
     •   No environment variables: App deploys serverless - avoid libraries requiring env vars unless they support defaults
-    •   React/Vite best practices: Follow patterns compatible with Vite + React (avoid Next.js-specific APIs)
+    •   Next.js best practices: Follow latest patterns to prevent dev server rendering issues
     •   Tailwind classes: Verify all classes exist in tailwind.config.js (e.g., avoid undefined classes like \`border-border\`)
     •   Component exports: Export all components properly, avoid mixing default/named imports
     •   UI spacing: Ensure proper padding/margins, avoid left-aligned layouts without proper spacing
@@ -348,16 +544,7 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
        - **Importing React and other libraries should be done correctly.**
 
     **CRITICAL SYNTAX ERRORS - PREVENT AT ALL COSTS:**
-    
-    **CATASTROPHIC IMPORT SYNTAX ERRORS (Zero Tolerance):**
-    ❌ \`import React, 'react';\` → **FATAL**: Comma instead of 'from' keyword = build crash
-    ❌ \`import { scaleOrdinal } from 'd3-scale-chromatic';\` → **WRONG PACKAGE**: scaleOrdinal is in 'd3-scale'
-    ❌ \`import */styles/globals.css'\` → **INVALID**: Missing 'import' or wrong path syntax
-    ✅ \`import React from 'react';\` → **CORRECT**: Default import with 'from' keyword
-    ✅ \`import { useState } from 'react';\` → **CORRECT**: Named imports
-    ✅ \`import './styles/globals.css';\` → **CORRECT**: CSS import
-    
-    1. **IMPORT SYNTAX**: Always use \`import [item] from '[package]';\` - never use commas instead of 'from'
+    1. **IMPORT SYNTAX**: Always use correct import syntax. NEVER write \`import */styles/globals.css'\` - use \`import './styles/globals.css'\`
     2. **UNDEFINED VARIABLES**: Always import/define variables before use. \`cn is not defined\` = missing \`import { cn } from './lib/utils'\`
 
     **CRITICAL ERROR RECOVERY PATTERNS:**
@@ -374,19 +561,13 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
     Before writing any code, mentally verify:
     - All imports use correct syntax and paths. Be cautious about named vs default imports wherever needed.
     - All variables are defined before use  
-    - **No setState calls during render phase** - only in useEffect/event handlers
-    - **Zustand selectors are primitives only:**
-        ✅ \`const count = useStore(s => s.count);\` 
-        ✅ \`const name = useStore(s => s.name);\`
-        ❌ \`const { count, name } = useStore(s => ({ count: s.count, name: s.name }));\` = CRASH
-        ❌ \`const data = useStore(s => s.getData());\` = CRASH  
-        ❌ \`const state = useStore();\` = CRASH
-    - **All useEffect hooks have dependency arrays** - no exceptions
+    - No setState calls during render phase
+    - No object-literal selectors in Zustand (avoid \`useStore((state) => ({ ... }))\`; select primitives individually)
     - All Tailwind classes exist in config
     - External dependencies are available
     - Error boundaries around components that might fail
 
-    **Also dynamic imports may not work, so please avoid using them.**
+    **Also there is no support for websockets and dynamic imports may not work, so please avoid using them.**
 
     ### **IMPORT VALIDATION EXAMPLES**
     **CRITICAL**: Verify ALL imports before using. Wrong imports = runtime crashes.
@@ -423,10 +604,17 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
         Applying this rule to your situation will fix both the type-check errors and the browser's runtime error.
 
     # Never write image files! Never write jpeg, png, svg, etc files yourself! Always use some image url from the web.
-    **Do not recommend installing \`cloudflare:workers\` or \`cloudflare:durable-objects\` as dependencies, these are already installed in the project always.**
 
 </AVOID COMMON PITFALLS>`,
-    COMMON_DEP_DOCUMENTATION: `<COMMON DEPENDENCY DOCUMENTATION>
+	STYLE_GUIDE: `<STYLE_GUIDE>
+    • Use 2 spaces for indentation
+    • Use single quotes for strings
+    • Use double quotes for JSX attributes
+    • Use semicolons for statements
+    • **Always use named exports and imports**
+</STYLE_GUIDE>
+`,
+	COMMON_DEP_DOCUMENTATION: `<COMMON DEPENDENCY DOCUMENTATION>
     • **The @xyflow/react package doesn't export a default ReactFlow, it exports named imports.**
         - Don't import like this:
         \`import ReactFlow from '@xyflow/react';\`
@@ -434,19 +622,14 @@ COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
 
         - Import like this:
         \`import { ReactFlow } from '@xyflow/react';\`
-    • **@react-three/fiber ^9.0.0 and @react-three/drei ^10.0.0 require react ^19 and will not work with react ^18. And in general avoid using these**
+    • **@react-three/fiber ^9.0.0 and @react-three/drei ^10.0.0 require react ^19 and will not work with react ^18.**
         - Please upgrade react to 19 to use these packages.
         - With react 18, it will throw runtime error: Cannot read properties of undefined (reading 'S')
-        react@18.3.1 three@^0.160.0 comlink@^4.4.1 idb-keyval@^6.2.1 simplex-noise@^4.0.1 @msgpack/msgpack@^2.8.0 - These work well together
 
-    • **No support for dynamic imports may not work, so please avoid using them.**
-    - **Zustand v5 (Always Installed in Templates):**
-      - Selector patterns: See REACT INFINITE LOOP PREVENTION section for complete guidelines
-      - v5 syntax for useShallow: \`import { useShallow } from 'zustand/react/shallow';\`
-      - Store actions are stable and should NOT be in dependency arrays
+    • **No support for websockets and dynamic imports may not work, so please avoid using them.**
 </COMMON DEPENDENCY DOCUMENTATION>
 `,
-    COMMANDS: `<SETUP COMMANDS>
+	COMMANDS: `<SETUP COMMANDS>
     • **Provide explicit commands to install necessary dependencies ONLY.** DO NOT SUGGEST MANUAL CHANGES. These commands execute directly.
     • **Dependency Versioning:**
         - **Use specific, known-good major versions.** Avoid relying solely on 'latest' (unless you are unsure) which can introduce unexpected breaking changes.
@@ -468,7 +651,7 @@ bun add @geist-ui/react@1
 \`\`\`
 </SETUP COMMANDS>
 `,
-    CODE_CONTENT_FORMAT: `<CODE CONTENT GENERATION RULES> 
+	CODE_CONTENT_FORMAT: `<CODE CONTENT GENERATION RULES> 
     The generated content for any file should be one of the following formats: \`full_content\` or \`unified_diff\`.
 
     - **When working on an existing (previously generated) file and the scope of changes would be smaller than a unified diff, use \`unified_diff\` format.**
@@ -541,7 +724,7 @@ bun add @geist-ui/react@1
     When a changes to a file are big or the file itself is small, it is better to use \`full_content\` format, otherwise use \`unified_diff\` format. In the end, you should choose a format that minimizes the total length of response.
 </CODE CONTENT GENERATION RULES>
 `,
-    UI_GUIDELINES: `## UI MASTERY & VISUAL EXCELLENCE STANDARDS
+	UI_GUIDELINES: `## UI MASTERY & VISUAL EXCELLENCE STANDARDS
     
     ### 🎨 VISUAL HIERARCHY MASTERY
     • **Typography Excellence:** Create stunning text hierarchies:
@@ -603,7 +786,7 @@ bun add @geist-ui/react@1
     • **Mobile-First Excellence:** Design for mobile, enhance for desktop:
         - **Touch Targets:** Minimum 44px touch targets for mobile usability
         - **Typography Scaling:** text-2xl md:text-4xl lg:text-5xl for responsive headers
-        - **Image Handling:** Prefer Tailwind v3-safe utilities like aspect-video or aspect-[16/9] for consistent image ratios
+        - **Image Handling:** aspect-w-16 aspect-h-9 for consistent image ratios
     • **Breakpoint Strategy:** Use Tailwind breakpoints meaningfully:
         - **sm (640px):** Tablet portrait adjustments
         - **md (768px):** Tablet landscape and small desktop
@@ -621,46 +804,24 @@ bun add @geist-ui/react@1
     - ✅ **Empty State Beauty:** Inspiring empty states that guide users toward their first success
     - ✅ **Accessibility Excellence:** Proper contrast ratios, keyboard navigation, screen reader support
     - ✅ **Performance Smooth:** 60fps animations and instant perceived load times`,
-    UI_NON_NEGOTIABLES_V3: `## UI NON-NEGOTIABLES (Tailwind v3-safe, shadcn/ui first)
-
-1) Root Wrapper & Gutters (copy exactly)
-export default function Page() {
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="py-8 md:py-10 lg:py-12">
-        {/* content */}
-      </div>
-    </div>
-  );
-}
-
-2) Prefer shadcn/ui components heavily
-- Use shadcn/ui primitives for structure and widgets (e.g., Button, Card, Input, Sheet, Sidebar)
-- Import from "@/components/ui/..." and compose with Tailwind utilities. Use Radix primitives as needed for composition.
-
-3) Tailwind v3-safe Instructions
-- Avoid CSS @theme or CSS @plugin directives in component styles
-- Prefer built-in utilities only; avoid plugin-only utilities unless template shows they exist
-- For media sizing, prefer aspect-video or aspect-[16/9] and object-cover
-
-4) Good vs Bad
-- BAD: top-level <div> with no gutters (content flush to the left edge)
-- GOOD: wrap with max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 and section spacing py-8 md:py-10 lg:py-12
-
-5) Color & Contrast (light theme defaults)
-- Primary labels: text-foreground
-- Secondary/meta: text-muted-foreground
-- Selected state: bg-accent text-accent-foreground (or bg-primary text-primary-foreground)
-- Icons: text-foreground/80 hover:text-foreground
-- Inputs: bg-secondary text-secondary-foreground border border-input; placeholder:text-muted-foreground
-- Never place muted text over dark backgrounds; if background is dark, use paired *-foreground or text-white
-- Aim for >= 4.5:1 contrast for normal text (>= 3:1 for large)
-`,
-PROJECT_CONTEXT: `Here is everything you will need about the project:
+	PROJECT_CONTEXT: `Here is everything you will need for the project:
 
 <PROJECT_CONTEXT>
 
-{{phasesText}}
+<COMPLETED_PHASES>
+
+The following phases have been completed and implemented:
+
+{{phases}}
+
+</COMPLETED_PHASES>
+
+<LAST_DIFFS>
+These are the changes that have been made to the codebase since the last phase:
+
+{{lastDiffs}}
+
+</LAST_DIFFS>
 
 <CODEBASE>
 
@@ -683,20 +844,10 @@ Here are all the latest relevant files in the current codebase:
 
 </PROJECT_CONTEXT>
 `,
-}
-
-/*
-
-<LAST_DIFFS>
-These are the changes that have been made to the codebase since the last phase:
-
-{{lastDiffs}}
-
-</LAST_DIFFS>
-*/
+};
 
 export const STRATEGIES_UTILS = {
-    INITIAL_PHASE_GUIDELINES: `**First Phase: Stunning Frontend Foundation & Visual Excellence**
+	INITIAL_PHASE_GUIDELINES: `**First Phase: Stunning Frontend Foundation & Visual Excellence**
         * **🎨 VISUAL DESIGN FOUNDATION:** Establish breathtaking visual foundation:
             - **Design System Excellence:** Define beautiful color palettes, typography scales, and spacing rhythms
             - **Component Library Mastery:** Leverage shadcn components to create stunning, cohesive interfaces
@@ -730,7 +881,7 @@ export const STRATEGIES_UTILS = {
         * **Phase Granularity:** For *simple* applications, deliver a complete, stunning product in one phase. For *complex* applications, establish a visually excellent foundation that impresses immediately.
         * **Deployable Milestone:** First phase should be immediately demoable with stunning visual appeal that makes stakeholders excited about the final product.
         * **Override template home page**: Be sure to rewrite the home page of the app. Do not remove the existing homepage, rewrite on top of it.`,
-    SUBSEQUENT_PHASE_GUIDELINES: `**Subsequent Phases: Feature Excellence & Visual Refinement**
+	SUBSEQUENT_PHASE_GUIDELINES: `**Subsequent Phases: Feature Excellence & Visual Refinement**
         * **🌟 ITERATIVE VISUAL EXCELLENCE:** Each phase elevates the user experience:
             - **Visual Polish Iteration:** Continuously refine spacing, colors, and interactions
             - **Animation Enhancement:** Add smooth transitions and delightful micro-interactions
@@ -765,22 +916,21 @@ export const STRATEGIES_UTILS = {
             - **Comprehensive Polish Review:** Every pixel perfect, every interaction smooth
             - **Performance Optimization:** Lightning-fast load times with beautiful interfaces
             - **Cross-Browser Excellence:** Perfect rendering across all modern browsers
-            - **Launch Readiness:** Production-ready code
-            - **Have a WOW factor that leaves the client amazed and wanting more**
-        **Always deliver project within the agreed timeline and scope**`,
-    CODING_GUIDELINES: `**Make sure the product is **FUNCTIONAL** along with **POLISHED**
+            - **Quality Assurance:** Thorough testing of every feature and interaction
+            - **Launch Readiness:** Production-ready code with comprehensive documentation`,
+	CODING_GUIDELINES: `**Make sure the product is **FUNCTIONAL** along with **POLISHED**
     **MAKE SURE TO NOT BREAK THE APPLICATION in SUBSEQUENT PHASES. Always keep fallbacks and failsafes in place for any backend interactions. Look out for simple syntax errors and dependencies you use!**
     **The client needs to be provided with a good demoable application after each phase. The initial first phase is the most impressionable phase! Make sure it deploys and renders well.**
     **Make sure the primary (home) page is rendered correctly and as expected after each phase**
     **Make sure to overwrite the home page file**`,
-    CONSTRAINTS: `<PHASE GENERATION CONSTRAINTS>
+	CONSTRAINTS: `<PHASE GENERATION CONSTRAINTS>
         **Focus on building the frontend and all the views/pages in the initial 1-2 phases with core functionality and mostly mock data, then fleshing out the application**    
         **Before writing any components of your own, make sure to check the existing components and files in the template, try to use them if possible (for example preinstalled shadcn components)**
         **If auth functionality is required, provide mock auth functionality primarily. Provide real auth functionality ONLY IF template has persistence layer. Remember to seed the persistence layer with mock data AND Always PREFILL the UI with mock credentials. No oauth needed**
 
         **Applications with single view/page or mostly static content are considered **Simple Projects** and those with multiple views/pages are considered **Complex Projects** and should be designed accordingly.**
-        * **Phase Count:** Aim for a maximum of 1 phase for simple applications and 3-7 phases for complex applications. Each phase should be self-contained. Do not exceed more than ${Math.floor(MAX_PHASES * 0.8)} phases unless addressing complex client requirements or feedbacks.
-        * **File Count:** Aim for a maximum of 1-3 files per phase when each file is big and self-container, or 8-12 files per phase when most files are small (< 100 lines).
+        * **Phase Count:** Aim for a maximum of 1 phase for simple applications and 3-7 phases for complex applications. Each phase should be self-contained. Do not exceed more than ${Math.floor(MAX_PHASES * 0.8)} phases unless addressing complex client feedbacks.
+        * **File Count:** Aim for a maximum of 1-3 files per phase for simple applications and 8-12 files per phase for complex applications.
         * The number of files in the project should be proportional to the number of views/pages that the project has.
         * Keep the size of codebase as small as possible, write encapsulated and abstracted code that can be reused, maximize code and component reuse and modularity. If a function/component is to be used in multiple files, it should be defined in a shared file.
         **DO NOT WRITE/MODIFY README FILES, LICENSES, ESSENTIAL CONFIG, OR OTHER NON-APPLICATION FILES as they are already configured in the final deployment. You are allowed to modify tailwind.config.js, vite.config.js etc if necessary**
@@ -788,22 +938,22 @@ export const STRATEGIES_UTILS = {
         **DO NOT WRITE pdf files, images, or any other non-text files as they are not supported by the deployment.**
 
         **Examples**:
-            * Building any tic-tac-toe game: Has a single page, simple logic -> **Simple Project** - 1 phase and 1-2 files that contain most of the code. Initial phase should yield a perfectly working game.        
-            * Building any themed 2048 game: Has a single page, simple logic -> **Simple Project** - 1 phase and 2 files max that contain most of the code. Initial phase should yield a perfectly working game.
+            * Building any tic-tac-toe game: Has a single page, simple logic -> **Simple Project** - 1 phase and 1-2 files. Initial phase should yield a perfectly working game.        
+            * Building any themed 2048 game: Has a single page, simple logic -> **Simple Project** - 1 phase and 2 files max. Initial phase should yield a perfectly working game.
             * Building a full chess platform: Has multiple pages -> **Complex Project** - 3-5 phases and 5-15 files, with initial phase having around 5-11 files and should have the primary homepage working with mockups for all other views.
             * Building a full e-commerce platform: Has multiple pages -> **Complex Project** - 3-5 phases and 5-15 files max, with initial phase having around 5-11 files and should have the primary homepage working with mockups for all other views.
-            * Building a minecraft clone: Has complex 3d rendering and multiple views -> **Complex Project** - 5-7 phases and 10-20 files max
+    
 
         <TRUST & SAFETY POLICIES>
-        • **NEVER** provide any code that can be used to perform nefarious/malicious activities.
-        • **If a user asks to build a clone or look-alike of a popular product or service, alter the name and description, and explicitly add a visible disclaimer that it is a clone or look-alike to avoid phishing concerns.**
+        • **NEVER** provide any code that can be used to perform nefarious/malicious or against Cloudflare's policies.
+        • **If a user asks to build a clone or look-alike of a popular product or service, alter the name and description, and explicitly add a visible disclaimer that it is a clone or look-alike.**
         • **NEVER** Let users build applications for phishing or malicious purposes.
         </TRUST & SAFETY POLICIES>
     </PHASE GENERATION CONSTRAINTS>`,
-}
+};
 
 export const STRATEGIES = {
-    FRONTEND_FIRST_PLANNING: `<PHASES GENERATION STRATEGY>
+	FRONTEND_FIRST_PLANNING: `<PHASES GENERATION STRATEGY>
     **STRATEGY: Scalable, Demoable Frontend and core application First / Iterative Feature Addition later**
     The project would be developed live: The user (client) would be provided a preview link after each phase. This is our rapid development and delivery paradigm.
     The core principle is to establish a visually complete and polished frontend presentation early on with core functionalities implemented, before layering in more advanced functionality and fleshing out the backend.
@@ -817,15 +967,15 @@ export const STRATEGIES = {
 
     ${STRATEGIES_UTILS.CONSTRAINTS}
 
-    **No need to add accessibility features. Focus on delivering an actually working, feature-wise polished and complete application in as few phases as possible.**
+    **No need to add accessibility features. Focus on delivering an actually feature-wise polished and complete application in as few phases as possible.**
     **Always stick to existing project/template patterns. Respect and work with existing worker bindings rather than making custom ones**
     **Rely on open source tools and free tier services only apart from whats configured in the environment. Refer to template usage instructions to know if specific cloudflare services are also available for use.**
-    **Make sure to implement all the features and functionality requested by the user. Stick to the blueprint's implementation roadmap and end at the conclusion of the final phase. There should be no compromises**
+    **Make sure to implement all the features and functionality requested by the user and more. The application should be fully complete by the end of the last phase. There should be no compromises**
     **This is a Cloudflare Workers & Durable Objects project. The environment is preconfigured. Absolutely DO NOT Propose changes to wrangler.toml or any other config files. These config files are hidden from you but they do exist.**
     **The Homepage of the frontend is a dummy page. It should be rewritten as the primary page of the application in the initial phase.**
     **Refrain from editing any of the 'dont touch' files in the project, e.g - package.json, vite.config.ts, wrangler.jsonc, etc.**
-</PHASES GENERATION STRATEGY>`, 
-FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
+</PHASES GENERATION STRATEGY>`,
+	FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
     **STRATEGY: Scalable, Demoable Frontend and core application First / Iterative Feature Addition later**
     The project would be developed live: The user (client) would be provided a preview link after each phase. This is our rapid development and delivery paradigm.
     The core principle is to establish a visually complete and polished frontend presentation early on with core functionalities implemented, before layering in more advanced functionality and fleshing out the backend.
@@ -839,75 +989,85 @@ FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
     ${STRATEGIES_UTILS.CODING_GUIDELINES}
 
     **Make sure to implement all the features and functionality requested by the user and more. The application should be fully complete by the end of the last phase. There should be no compromises**
-</PHASES GENERATION STRATEGY>`, 
-}
+</PHASES GENERATION STRATEGY>`,
+};
 
 export interface GeneralSystemPromptBuilderParams {
-    query: string,
-    templateDetails?: TemplateDetails,
-    dependencies?: Record<string, string>,
-    blueprint?: Blueprint,
-    language?: string,
-    frameworks?: string[],
-    templateMetaInfo?: TemplateSelection,
+	query: string;
+	templateDetails: TemplateDetails;
+	dependencies: Record<string, string>;
+	blueprint?: Blueprint;
+	language?: string;
+	frameworks?: string[];
+	templateMetaInfo?: TemplateSelection;
 }
 
 export function generalSystemPromptBuilder(
-    prompt: string,
-    params: GeneralSystemPromptBuilderParams
+	prompt: string,
+	params: GeneralSystemPromptBuilderParams,
+    customData?: any,
 ): string {
-    // Base variables always present
-    const variables: Record<string, string> = {
-        query: params.query,
-    };
-    
-    // Template context (optional)
-    if (params.templateDetails) {
-        variables.template = PROMPT_UTILS.serializeTemplate(params.templateDetails);
-        variables.dependencies = JSON.stringify(params.dependencies ?? {});
-    }
+	// Base variables always present
+	const variables: Record<string, string> = {
+		query: params.query,
+		template: PROMPT_UTILS.serializeTemplate(params.templateDetails),
+		dependencies: JSON.stringify(params.dependencies ?? {}),
+        liveData: '',
+	};
 
-    // Blueprint variables - discriminate by type
-    if (params.blueprint) {
-        if ('implementationRoadmap' in params.blueprint) {
-            // Phasic blueprint
-            const phasicBlueprint = params.blueprint as PhasicBlueprint;
-            const blueprintForPrompt = { ...phasicBlueprint, initialPhase: undefined };
-            variables.blueprint = TemplateRegistry.markdown.serialize(blueprintForPrompt, BlueprintSchemaLite);
-            variables.blueprintDependencies = phasicBlueprint.frameworks?.join(', ') ?? '';
-        } else {
-            // Agentic blueprint
-            const agenticBlueprint = params.blueprint as AgenticBlueprint;
-            variables.blueprint = TemplateRegistry.markdown.serialize(agenticBlueprint, AgenticBlueprintSchema);
-            variables.blueprintDependencies = agenticBlueprint.frameworks?.join(', ') ?? '';
-            variables.agenticPlan = agenticBlueprint.plan.map((step, i) => `${i + 1}. ${step}`).join('\n');
-        }
-    }
+	// Optional blueprint variables
+	if (params.blueprint) {
+		variables.blueprint = TemplateRegistry.markdown.serialize(
+			params.blueprint,
+			BlueprintSchema,
+		);
+		variables.blueprintDependencies =
+			params.blueprint.frameworks?.join(', ') ?? '';
+	}
 
-    // Optional language and frameworks
-    if (params.language) {
-        variables.language = params.language;
-    }
-    if (params.frameworks) {
-        variables.frameworks = params.frameworks.join(', ');
-    }
-    if (params.templateMetaInfo) {
-        variables.usecaseSpecificInstructions = getUsecaseSpecificInstructions(params.templateMetaInfo);
-    }
+	// Optional language and frameworks
+	if (params.language) {
+		variables.language = params.language;
+	}
+	if (params.frameworks) {
+		variables.frameworks = params.frameworks.join(', ');
+	}
+	if (params.templateMetaInfo) {
+		variables.usecaseSpecificInstructions = getUsecaseSpecificInstructions(
+			params.templateMetaInfo,
+		);
+	}
 
-    const formattedPrompt = PROMPT_UTILS.replaceTemplateVariables(prompt, variables);
-    return PROMPT_UTILS.verifyPrompt(formattedPrompt);
+    if (customData) {
+	try {
+		const { formatLiveData } = require('./operations/prompts/phaseImplementationPrompts');
+		variables.liveData = formatLiveData(customData);
+	} catch (error) {
+		console.error('Error formatting live data:', error);
+		variables.liveData = '';
+	}
+}
+
+	const formattedPrompt = PROMPT_UTILS.replaceTemplateVariables(
+		prompt,
+		variables,
+	);
+	return PROMPT_UTILS.verifyPrompt(formattedPrompt);
 }
 
 export function issuesPromptFormatter(issues: IssueReport): string {
-    const runtimeErrorsText = PROMPT_UTILS.serializeErrors(issues.runtimeErrors);
-    const staticAnalysisText = PROMPT_UTILS.serializeStaticAnalysis(issues.staticAnalysis);
-    
-    return `## ERROR ANALYSIS PRIORITY MATRIX
+	const runtimeErrorsText = PROMPT_UTILS.serializeErrors(
+		issues.runtimeErrors,
+	);
+	const staticAnalysisText = PROMPT_UTILS.serializeStaticAnalysis(
+		issues.staticAnalysis,
+	);
+
+	return `## ERROR ANALYSIS PRIORITY MATRIX
 
 ### 1. CRITICAL RUNTIME ERRORS (Fix First - Deployment Blockers)
 **Error Count:** ${issues.runtimeErrors?.length || 0} runtime errors detected
-**Contains Render Loops:** ${runtimeErrorsText.includes('Maximum update depth') || runtimeErrorsText.includes('Too many re-renders') || runtimeErrorsText.includes('infinite loop') ? 'YES - HIGHEST PRIORITY' : 'No'}
+**Contains Render Loops:** ${runtimeErrorsText.includes('Maximum update depth') || runtimeErrorsText.includes('Too many re-renders') ? 'YES - HIGHEST PRIORITY' : 'No'}
 
 ${runtimeErrorsText || 'No runtime errors detected'}
 
@@ -918,136 +1078,135 @@ ${runtimeErrorsText || 'No runtime errors detected'}
 ${staticAnalysisText}
 
 ## ANALYSIS INSTRUCTIONS
-- **PRIORITIZE** "Maximum update depth exceeded" and useEffect-related errors. If 'Warning: The result of getSnapshot should be cached to avoid an infinite loop' is present, it is a high priority issue to be resolved ASAP. 
+- **PRIORITIZE** "Maximum update depth exceeded" and useEffect-related errors  
 - **CROSS-REFERENCE** error messages with current code structure (line numbers may be outdated)
 - **VALIDATE** reported issues against actual code patterns before fixing
-- **FOCUS** on deployment-blocking runtime errors over linting issues`
+- **FOCUS** on deployment-blocking runtime errors over linting issues`;
 }
 
-const COMPLETED_PHASES_CONTEXT = `
-<COMPLETED_PHASES>
-
-The following phases have been completed and implemented:
-
-{{redactionNotice}}
-
-{{phases}}
-
-</COMPLETED_PHASES>`
-
 export const USER_PROMPT_FORMATTER = {
-    PROJECT_CONTEXT: (phases: PhaseConceptType[], files: FileState[], fileTree: FileTreeNode, commandsHistory: string[], serializerType: CodeSerializerType = CodeSerializerType.SIMPLE) => {
-        let lastPhaseFilesDiff = '';
-        let phasesText = '';
-        try {
-            if (phases.length > 1) {
-                const lastPhase = phases[phases.length - 1];
-                if (lastPhase && lastPhase.files) {
-                    // Get last phase files diff only
-                    const fileMap = new Map<string, FileState>();
-                    files.forEach((file) => fileMap.set(file.filePath, file));
-                    const lastPhaseFiles = lastPhase.files.map((file) => fileMap.get(file.path)).filter((file) => file !== undefined);
-                    lastPhaseFilesDiff = lastPhaseFiles.map((file) => file.lastDiff).join('\n');
-        
-                    // Set lastPhase = false for all phases but the last
-                    phases.forEach((phase) => {
-                        if (phase !== lastPhase) {
-                            phase.lastPhase = false;
-                        }
-                    });
-                }
+	PROJECT_CONTEXT: (
+		phases: PhaseConceptType[],
+		files: FileState[],
+		fileTree: FileTreeNode,
+		commandsHistory: string[],
+		serializerType: CodeSerializerType = CodeSerializerType.SIMPLE,
+	) => {
+		let lastPhaseFilesDiff = '';
+		try {
+			if (phases.length > 1) {
+				const lastPhase = phases[phases.length - 1];
+				if (lastPhase && lastPhase.files) {
+					// Get last phase files diff only
+					const fileMap = new Map<string, FileState>();
+					files.forEach((file) => fileMap.set(file.filePath, file));
+					const lastPhaseFiles = lastPhase.files
+						.map((file) => fileMap.get(file.path))
+						.filter((file) => file !== undefined);
+					lastPhaseFilesDiff = lastPhaseFiles
+						.map((file) => file.lastDiff)
+						.join('\n');
 
-                // Split phases into older (redacted) and last
-                const olderPhases = phases.slice(0, -1);
-                
-                // Serialize older phases without files, recent phases with files
-                if (olderPhases.length > 0) {
-                    const olderPhasesLite = olderPhases.map(({ name, description }) => ({ name, description }));
-                    phasesText += TemplateRegistry.markdown.serialize({ phases: olderPhasesLite }, z.object({ phases: z.array(PhaseConceptLiteSchema) }));
-                }
-                phasesText += '\n\nLast Phase Implemented:\n' + TemplateRegistry.markdown.serialize(lastPhase, PhaseConceptSchema);
-                
-                const redactionNotice = olderPhases.length > 0 
-                    ? `**Note:** File details for the first ${olderPhases.length} phase(s) have been redacted to optimize context. Only the last phase includes complete file information.\n` 
-                    : '';
+					// Set lastPhase = false for all phases but the last
+					phases.forEach((phase) => {
+						if (phase !== lastPhase) {
+							phase.lastPhase = false;
+						}
+					});
+				}
+			}
+		} catch (error) {
+			console.error('Error processing project context:', error);
+		}
 
-                phasesText = COMPLETED_PHASES_CONTEXT.replaceAll('{{phases}}', phasesText).replaceAll('{{redactionNotice}}', redactionNotice);
-            }
-        } catch (error) {
-            console.error('Error processing project context:', error);
-        }
+		const variables: Record<string, string> = {
+			phases: TemplateRegistry.markdown.serialize(
+				{ phases: phases },
+				z.object({ phases: z.array(PhaseConceptSchema) }),
+			),
+			files: PROMPT_UTILS.serializeFiles(files, serializerType),
+			fileTree: PROMPT_UTILS.serializeTreeNodes(fileTree),
+			lastDiffs: lastPhaseFilesDiff,
+			commandsHistory:
+				commandsHistory.length > 0
+					? `<COMMANDS HISTORY>
 
-        const relevantFiles = getCodebaseContext(files);
+The following commands have been executed successfully in the project environment so far (These may not include the ones that are currently pending):
 
-        const variables: Record<string, string> = {
-            phasesText: phasesText,
-            files: PROMPT_UTILS.serializeFiles(relevantFiles, serializerType),
-            fileTree: PROMPT_UTILS.serializeTreeNodes(fileTree),
-            lastDiffs: lastPhaseFilesDiff,
-            commandsHistory: commandsHistory.length > 0 ? `<COMMANDS HISTORY>\n\nThe following commands have been executed successfully in the project environment so far (These may not include the ones that are currently pending):\n\n${commandsHistory.join('\n')}\n\n</COMMANDS HISTORY>` : ''
-        };
+${commandsHistory.join('\n')}
 
-        const prompt = PROMPT_UTILS.replaceTemplateVariables(PROMPT_UTILS.PROJECT_CONTEXT, variables);
-        
-        return PROMPT_UTILS.verifyPrompt(prompt);
-    },
+</COMMANDS HISTORY>`
+					: '',
+		};
+
+		const prompt = PROMPT_UTILS.replaceTemplateVariables(
+			PROMPT_UTILS.PROJECT_CONTEXT,
+			variables,
+		);
+
+		return PROMPT_UTILS.verifyPrompt(prompt);
+	},
 };
 
-const getStyleInstructions = (style: TemplateSelection['styleSelection']): string => {
-    switch (style) {
-        case `Brutalism`:
-            return `
+const getStyleInstructions = (
+	style: TemplateSelection['styleSelection'],
+): string => {
+	switch (style) {
+		case `Brutalism`:
+			return `
 **Style Name: Brutalism**
 - Characteristics: Raw aesthetics, often with bold vibrant colors on light background, large typography, large elements.
 - Philosophy: Emphasizes honesty and simplicity, Non-grid, asymmetrical layouts that ignore traditional design hierarchy.
 - Example Elements: Large, blocky layouts, heavy use of whitespace, unconventional navigation patterns.
 `;
-        case 'Retro':
-            return `
+		case 'Retro':
+			return `
 **Style Name: Retro**
 - Characteristics: Early-Internet graphics, pixel art, 3D objects, or glitch effects.
 - Philosophy: Nostalgia-driven, aiming to evoke the look and feel of 90s or early 2000s web culture.
 - Example Elements: Neon palettes, grainy textures, gradient meshes, and quirky fonts.`;
-        case 'Illustrative':
-            return `
+		case 'Illustrative':
+			return `
 **Style Name: Illustrative**
 - Characteristics: Custom illustrations, sketchy graphics, and playful elements
 - Philosophy: Human-centered, whimsical, and expressive.
 - Example Elements: Cartoon-style characters, brushstroke fonts, animated SVGs.
 - Heading Font options: Playfair Display, Fredericka the Great, Great Vibes
-            `
-//         case 'Neumorphism':
-//             return `
-// **Style Name: Neumorphism (Soft UI)**
-// - Use a soft pastel background, high-contrast accent colors for functional elements e.g. navy, coral, or bright blue. Avoid monochrome UIs
-// - Light shadow (top-left) and dark shadow (bottom-right) to simulate extrusion or embedding, Keep shadows subtle but visible to prevent a washed-out look.
-// - Avoid excessive transparency in text — keep readability high.
-// - Integrate glassmorphism subtly`;
-        case `Kid_Playful`:
-            return `
+            `;
+		//         case 'Neumorphism':
+		//             return `
+		// **Style Name: Neumorphism (Soft UI)**
+		// - Use a soft pastel background, high-contrast accent colors for functional elements e.g. navy, coral, or bright blue. Avoid monochrome UIs
+		// - Light shadow (top-left) and dark shadow (bottom-right) to simulate extrusion or embedding, Keep shadows subtle but visible to prevent a washed-out look.
+		// - Avoid excessive transparency in text — keep readability high.
+		// - Integrate glassmorphism subtly`;
+		case `Kid_Playful`:
+			return `
 **Style Name: Kid Playful**
 - Bright, contrasting colors
 - Stylized illustrations resembling 2D animation or children's book art
 - Smooth, rounded shapes and clean borders—no gradients or realism
 - Similar to Pablo Stanley, Burnt Toast Creative, or Outline-style art.
-- Children's book meets modern web`
-        case 'Minimalist Design':
-            return `
+- Children’s book meets modern web`;
+		case 'Minimalist Design':
+			return `
 **Style Name: Minimalist Design**
 Characteristics: Clean layouts, lots of white space, limited color palettes, and simple typography.
 Philosophy: "Less is more." Focuses on clarity and usability.
 Example Elements: Monochrome schemes, subtle animations, grid-based layouts.
 ** Apply a gradient background or subtle textures to the hero section for depth and warmth.
-`
-    }
-    return `
+`;
+	}
+	return `
 ** Apply a gradient background or subtle textures to the hero section for depth and warmth.
 ** Choose a modern sans-serif font like Inter, Sora, or DM Sans
 ** Use visual contrast: white or light background, or very soft gradient + clean black text.
-    `
+    `;
 };
 
-const SAAS_LANDING_INSTRUCTIONS = (style: TemplateSelection['styleSelection']): string => `
+const SAAS_LANDING_INSTRUCTIONS = (
+	style: TemplateSelection['styleSelection'],
+): string => `
 ** If there is no brand/product name specified, come up with a suitable name
 ** Include a prominent hero section with a headline, subheadline, and a clear call-to-action (CTA) button above the fold.
 ** Insert a pricing table with tiered plans if applicable
@@ -1079,16 +1238,18 @@ const DASHBOARD_INSTRUCTIONS = (): string => `
 ** Dashboard should be information dense.
 `;
 
-export const getUsecaseSpecificInstructions = (selectedTemplate: TemplateSelection): string => {
-    switch (selectedTemplate.useCase) {
-        case 'SaaS Product Website':
-            return SAAS_LANDING_INSTRUCTIONS(selectedTemplate.styleSelection);
-        case 'E-Commerce':
-            return ECOMM_INSTRUCTIONS();
-        case 'Dashboard':
-            return DASHBOARD_INSTRUCTIONS();
-        default:
-            return `Use the following artistic style:
+export const getUsecaseSpecificInstructions = (
+	selectedTemplate: TemplateSelection,
+): string => {
+	switch (selectedTemplate.useCase) {
+		case 'SaaS Product Website':
+			return SAAS_LANDING_INSTRUCTIONS(selectedTemplate.styleSelection);
+		case 'E-Commerce':
+			return ECOMM_INSTRUCTIONS();
+		case 'Dashboard':
+			return DASHBOARD_INSTRUCTIONS();
+		default:
+			return `Use the following artistic style:
             ${getStyleInstructions(selectedTemplate.styleSelection)}`;
-    }
-}
+	}
+};

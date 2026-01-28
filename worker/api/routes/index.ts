@@ -3,18 +3,19 @@ import { setupAppRoutes } from './appRoutes';
 import { setupUserRoutes } from './userRoutes';
 import { setupStatsRoutes } from './statsRoutes';
 import { setupAnalyticsRoutes } from './analyticsRoutes';
-// import { setupUserSecretsRoutes } from './userSecretsRoutes';
+import { setupSecretsRoutes } from './secretsRoutes';
 import { setupModelConfigRoutes } from './modelConfigRoutes';
 import { setupModelProviderRoutes } from './modelProviderRoutes';
 import { setupGitHubExporterRoutes } from './githubExporterRoutes';
 import { setupCodegenRoutes } from './codegenRoutes';
-import { setupScreenshotRoutes } from './imagesRoutes';
+import { setupScreenshotRoutes } from './screenshotRoutes';
 import { setupSentryRoutes } from './sentryRoutes';
-import { setupCapabilitiesRoutes } from './capabilitiesRoutes';
-import { setupTicketRoutes } from './ticketRoutes';
+import { setupSSOUserRoutes } from './ssoUserRoutes';
+import { setupPaymentsRoutes } from './paymentsRoutes';
 import { Hono } from "hono";
 import { AppEnv } from "../../types/appenv";
 import { setupStatusRoutes } from './statusRoutes';
+import flexifunnelsProjectRoutes from './flexifunnelsProjectRoutes';
 
 export function setupRoutes(app: Hono<AppEnv>): void {
     // Health check route
@@ -28,14 +29,8 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // Platform status routes (public)
     setupStatusRoutes(app);
 
-    // Platform capabilities routes (public)
-    setupCapabilitiesRoutes(app);
-
     // Authentication and user management routes
     setupAuthRoutes(app);
-    
-    // WebSocket ticket routes
-    setupTicketRoutes(app);
     
     // Codegen routes
     setupCodegenRoutes(app);
@@ -52,11 +47,8 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // AI Gateway Analytics routes
     setupAnalyticsRoutes(app);
     
-    // // Secrets management routes (legacy D1-based)
-    // setupSecretsRoutes(app);
-
-    // // User secrets vault routes
-    // setupUserSecretsRoutes(app);
+    // Secrets management routes
+    setupSecretsRoutes(app);
     
     // Model configuration and provider keys routes
     setupModelConfigRoutes(app);
@@ -69,4 +61,12 @@ export function setupRoutes(app: Hono<AppEnv>): void {
 
     // Screenshot serving routes (public)
     setupScreenshotRoutes(app);
+
+    // SSO User routes
+    setupSSOUserRoutes(app);
+
+    // Payments routes (for AI-generated apps to query sales data)
+    setupPaymentsRoutes(app);
+
+    app.route('/api/flexifunnels', flexifunnelsProjectRoutes);
 }

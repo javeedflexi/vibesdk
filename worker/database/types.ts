@@ -310,3 +310,25 @@ export interface HealthStatusResult {
     timestamp: string;
     details?: Record<string, unknown>;
 }
+// ========================================
+// SECRETS MANAGEMENT TYPES
+// ========================================
+
+/**
+ * Secret data structure
+ */
+export interface SecretData {
+    provider: string;
+    key: string;
+    value: string;
+}
+
+/**
+ * Encrypted secret structure
+ */
+export interface EncryptedSecret {
+    provider: string;
+    key: string;
+    encryptedValue: string;
+    keyPreview: string;
+}

@@ -83,7 +83,8 @@ export const ProcessStateSchema = z.enum([
   'running',
   'stopping',
   'stopped',
-  'crashed'
+  'crashed',
+  'restarting'
 ]);
 export type ProcessState = z.infer<typeof ProcessStateSchema>;
 
@@ -109,9 +110,9 @@ export interface MonitoringOptions {
   readonly restartDelay?: number;
   readonly healthCheckInterval?: number;
   readonly errorBufferSize?: number;
+  readonly enableMetrics?: boolean;
   readonly env?: Record<string, string>;
   readonly killTimeout?: number;
-  readonly expectedPort?: number; // Port the child process should bind to (for health checks)
 }
 
 // ==========================================
@@ -293,16 +294,13 @@ export type Result<T, E = Error> =
 // CONSTANTS
 // ==========================================
 
-// Note: expectedPort is optional so we use Omit to exclude it from Required
-export const DEFAULT_MONITORING_OPTIONS: Omit<Required<MonitoringOptions>, 'expectedPort'> & { expectedPort?: number } = {
+export const DEFAULT_MONITORING_OPTIONS: MonitoringOptions = {
   autoRestart: true,
-  maxRestarts: 3,
+  maxRestarts: 6,
   restartDelay: 1000,
-  errorBufferSize: 100,
-  healthCheckInterval: 30000,
-  env: {},
-  killTimeout: 10000,
-  expectedPort: undefined
+  errorBufferSize: 300,
+  healthCheckInterval: 10000,
+  enableMetrics: false
 } as const;
 
 export const DEFAULT_STORAGE_OPTIONS: ErrorStoreOptions = {
@@ -328,6 +326,40 @@ export const getErrorDbPath = (): string => {
 
 export const getLogDbPath = (): string => {
   return process.env.CLI_LOG_DB_PATH || `${getDataDirectory()}/logs.db`;
+};
+
+// CLI tools path resolution for different environments
+export const getCliToolsPath = (): string => {
+  // In Docker container, use absolute path
+  if (process.env.CONTAINER_ENV === 'docker') {
+    return '/app/container/cli-tools.ts';
+  }
+  
+  // For local development, try to find the cli-tools.ts file
+  const path = require('path');
+  const fs = require('fs');
+  
+  // Common locations to check
+  const possiblePaths = [
+    './cli-tools.ts',
+    './container/cli-tools.ts',
+    '../container/cli-tools.ts',
+    path.join(__dirname, 'cli-tools.ts'),
+    path.join(process.cwd(), 'container/cli-tools.ts')
+  ];
+  
+  for (const possiblePath of possiblePaths) {
+    try {
+      if (fs.existsSync(possiblePath)) {
+        return path.resolve(possiblePath);
+      }
+    } catch (error) {
+      // Continue checking other paths
+    }
+  }
+  
+  // Fallback to relative path
+  return './cli-tools.ts';
 };
 
 // Legacy constants for backward compatibility

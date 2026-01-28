@@ -23,40 +23,6 @@ import {
   getLogDbPath
 } from './types.js';
 
-// Instance ID validation pattern - alphanumeric with dashes and underscores
-const INSTANCE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
-const MAX_INSTANCE_ID_LENGTH = 64;
-
-/**
- * Validate instance ID format to prevent path traversal and other issues
- */
-function validateInstanceId(id: string): void {
-  if (!id || id.length === 0) {
-    throw new Error('Instance ID is required');
-  }
-  if (id.length > MAX_INSTANCE_ID_LENGTH) {
-    throw new Error(`Instance ID must be ${MAX_INSTANCE_ID_LENGTH} characters or less`);
-  }
-  if (!INSTANCE_ID_PATTERN.test(id)) {
-    throw new Error('Instance ID must start with alphanumeric and contain only alphanumeric, dash, or underscore');
-  }
-}
-
-/**
- * Safely parse integer argument with validation
- */
-function parseIntArg(args: Record<string, unknown>, key: string): number | undefined {
-  const value = args[key];
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  const parsed = parseInt(String(value), 10);
-  if (isNaN(parsed)) {
-    throw new Error(`Invalid integer value for --${key}: ${value}`);
-  }
-  return parsed;
-}
-
 class SafeJSON {
   static stringify(data: unknown, space?: number): string {
     try {
@@ -71,7 +37,7 @@ class SafeJSON {
         return value;
       }, space);
       return json;
-    } catch {
+    } catch (error) {
       // Fallback for any stringify errors
       return JSON.stringify({
         error: 'Failed to serialize data',
@@ -84,7 +50,7 @@ class SafeJSON {
   static parse(text: string): unknown {
     try {
       return JSON.parse(text);
-    } catch {
+    } catch (error) {
       // Return error object for failed parsing
       return {
         success: false,
@@ -96,15 +62,16 @@ class SafeJSON {
 }
 
 class SafeCleanup {
-  /**
-   * Safely close storage manager.
-   * Storage.close() is synchronous, so we just wrap it in try-catch.
-   */
-  static closeStorage(storage: StorageManager | null): void {
+  static async closeStorage(storage: StorageManager | null, timeoutMs: number = 2000): Promise<void> {
     if (!storage) return;
-
+    
     try {
+      const timeout = setTimeout(() => {
+        console.warn('Storage close timeout, forcing cleanup');
+      }, timeoutMs);
+      
       storage.close();
+      clearTimeout(timeout);
     } catch (error) {
       console.warn('Storage close error:', error);
       // Don't throw - we're in cleanup
@@ -204,7 +171,6 @@ class ProcessCommands {
     args: string[];
     cwd?: string;
     port?: string;
-    healthCheckInterval?: number;
     maxRestarts?: number;
     restartDelay?: number;
     maxErrors?: number;
@@ -229,22 +195,10 @@ class ProcessCommands {
         envVars.PORT = options.port;
       }
 
-      const expectedPort = options.port ? Number.parseInt(options.port, 10) : undefined;
-      const hasExpectedPort = Number.isFinite(expectedPort);
-
-      // Default behavior for port-bound dev servers (e.g. Vite):
-      // - Probe every 10s
-      // - Retry for ~2 minutes (12 * 10s)
-      const defaultHealthCheckInterval = hasExpectedPort ? 10000 : DEFAULT_MONITORING_OPTIONS.healthCheckInterval;
-      const defaultRestartDelay = hasExpectedPort ? 1000 : DEFAULT_MONITORING_OPTIONS.restartDelay;
-      const defaultMaxRestarts = hasExpectedPort ? 120 : DEFAULT_MONITORING_OPTIONS.maxRestarts;
-
       const monitoring: MonitoringOptions = {
         ...DEFAULT_MONITORING_OPTIONS,
-        expectedPort: hasExpectedPort ? expectedPort : undefined,
-        healthCheckInterval: options.healthCheckInterval ?? defaultHealthCheckInterval,
-        maxRestarts: options.maxRestarts ?? defaultMaxRestarts,
-        restartDelay: options.restartDelay ?? defaultRestartDelay,
+        maxRestarts: options.maxRestarts ?? DEFAULT_MONITORING_OPTIONS.maxRestarts,
+        restartDelay: options.restartDelay ?? DEFAULT_MONITORING_OPTIONS.restartDelay,
         env: envVars
       };
 
@@ -277,10 +231,6 @@ class ProcessCommands {
       console.log(`  Working Directory: ${config.cwd}`);
       console.log(`  Max Restarts: ${monitoring.maxRestarts}`);
       console.log(`  Restart Delay: ${monitoring.restartDelay}ms`);
-      console.log(`  Health Check Interval: ${monitoring.healthCheckInterval ?? DEFAULT_MONITORING_OPTIONS.healthCheckInterval}ms`);
-      if (monitoring.expectedPort) {
-        console.log(`  Expected Port: ${monitoring.expectedPort}`);
-      }
 
       // Create and start ProcessRunner with storage options
       const runner = new ProcessRunner(config, { 
@@ -289,7 +239,7 @@ class ProcessCommands {
       });
       const startResult = await runner.start();
 
-      if (!startResult.success && 'error' in startResult) {
+      if (!startResult.success) {
         OutputFormatter.formatError(`Failed to start process: ${startResult.error.message}`);
         process.exit(1);
       }
@@ -359,7 +309,7 @@ class ProcessCommands {
 
       if (runner) {
         const stopResult = await runner.stop(options.force);
-        if (!stopResult.success && 'error' in stopResult) {
+        if (!stopResult.success) {
           OutputFormatter.formatError(`Failed to stop process: ${stopResult.error.message}`);
           process.exit(1);
         }
@@ -472,10 +422,8 @@ class ProcessRunner {
       // Convert Result<void> to Result<boolean>
       if (stopResult.success) {
         return { success: true, data: true };
-      } else if ('error' in stopResult) {
-        return { success: false, error: stopResult.error };
       } else {
-        return { success: false, error: new Error('Unknown error stopping process') };
+        return { success: false, error: stopResult.error };
       }
     } catch (error) {
       return { 
@@ -555,7 +503,7 @@ class ErrorCommands {
       storage = new StorageManager(options.dbPath);
       const result = storage.getErrors(options.instanceId);
       
-      if (!result.success && 'error' in result) {
+      if (!result.success) {
         throw result.error;
       }
 
@@ -611,10 +559,7 @@ class ErrorCommands {
 
         const clearResult = storage.clearErrors(options.instanceId);
         if (!clearResult.success) {
-          if ('error' in clearResult) {
-            throw clearResult.error;
-          }
-          throw new Error('Failed to clear errors');
+          throw clearResult.error;
         }
 
         resetInfo = { clearedCount: clearResult.data.clearedCount };
@@ -643,10 +588,18 @@ class ErrorCommands {
         // Fallback if formatting fails
         console.error(SafeJSON.stringify({ success: false, error: String(error) }));
       }
+      
+      // Ensure cleanup before exit
+      if (storage) {
+        try {
+          storage.close();
+        } catch (closeError) {
+          // Ignore close errors
+        }
+      }
       process.exit(1);
     } finally {
-      // Single cleanup point - close storage only once
-      SafeCleanup.closeStorage(storage);
+      await SafeCleanup.closeStorage(storage);
     }
   }
 
@@ -655,7 +608,7 @@ class ErrorCommands {
     
     try {
       const result = storage.getErrorSummary(options.instanceId);
-      if (!result.success && 'error' in result) {
+      if (!result.success) {
         throw result.error;
       }
 
@@ -677,7 +630,7 @@ class ErrorCommands {
       );
       process.exit(1);
     } finally {
-      SafeCleanup.closeStorage(storage);
+      await SafeCleanup.closeStorage(storage);
     }
   }
 
@@ -691,7 +644,7 @@ class ErrorCommands {
     
     try {
       const result = storage.clearErrors(options.instanceId);
-      if (!result.success && 'error' in result) {
+      if (!result.success) {
         throw result.error;
       }
 
@@ -713,7 +666,7 @@ class ErrorCommands {
       );
       process.exit(1);
     } finally {
-      SafeCleanup.closeStorage(storage);
+      await SafeCleanup.closeStorage(storage);
     }
   }
 
@@ -754,7 +707,7 @@ class LogCommands {
       };
 
       const result = storage.getLogs(filter);
-      if (!result.success && 'error' in result) {
+      if (!result.success) {
         throw result.error;
       }
 
@@ -778,7 +731,7 @@ class LogCommands {
       );
       process.exit(1);
     } finally {
-      SafeCleanup.closeStorage(storage);
+      await SafeCleanup.closeStorage(storage);
     }
   }
 
@@ -788,91 +741,70 @@ class LogCommands {
     instanceId: string;
     format?: 'json' | 'raw';
     reset?: boolean;
-    durationSeconds?: number;
   }): Promise<void> {
     try {
       const { promises: fs } = require('fs');
       const { join } = require('path');
-      const { randomUUID } = require('crypto');
-
+      
       const logFilePath = join(getDataDirectory(), `${options.instanceId}-process.log`);
       const lockFilePath = `${logFilePath}.lock`;
-      const tempPath = `${logFilePath}.tmp.${randomUUID()}.${process.pid}`;
-
+      const tempPath = `${logFilePath}.tmp.${Date.now()}.${process.pid}`;
+      
       let logs = '';
-
-      const LOCK_STALE_MS = 30000; // Must match FileLock in process-monitor.ts
-      const MAX_RETRIES = 10;
-      const RETRY_DELAY_MS = 50;
-
-      // File-based locking coordinated with SimpleLogManager
+      
+      // Simple file-based locking to prevent concurrent access
       const acquireLock = async (): Promise<boolean> => {
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-          try {
-            await fs.writeFile(lockFilePath, `${process.pid}:${Date.now()}`, { flag: 'wx' });
-            return true;
-          } catch (error: unknown) {
-            const fsError = error as { code?: string };
-            if (fsError?.code === 'EEXIST') {
-              // Lock exists - check if stale
-              try {
-                const content = await fs.readFile(lockFilePath, 'utf8');
-                const [, timestamp] = content.split(':');
-                const lockTime = parseInt(timestamp, 10);
-                if (Date.now() - lockTime > LOCK_STALE_MS) {
-                  // Stale lock - remove and retry
-                  await fs.unlink(lockFilePath).catch(() => {});
-                  continue;
-                }
-              } catch {
-                // Can't read lock file - try again
-              }
-              // Wait and retry
-              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS + Math.random() * RETRY_DELAY_MS));
-            } else {
-              return false;
-            }
-          }
+        try {
+          await fs.writeFile(lockFilePath, process.pid.toString(), { flag: 'wx' });
+          return true;
+        } catch (error) {
+          return false;
         }
-        return false;
       };
-
+      
       const releaseLock = async (): Promise<void> => {
         try {
           await fs.unlink(lockFilePath);
-        } catch {
+        } catch (error) {
           // Ignore lock release errors
         }
       };
-
-      const lockAcquired = await acquireLock();
-
-      if (!lockAcquired) {
-        throw new Error('Could not acquire file lock for log operation');
+      
+      // Try to acquire lock with retry
+      let lockAcquired = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        lockAcquired = await acquireLock();
+        if (lockAcquired) break;
+        
+        // Wait briefly before retry
+        await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 50));
       }
-
+      
+      if (!lockAcquired) {
+        throw new Error('Could not acquire file lock for log reset operation');
+      }
+      
       try {
         if (options.reset) {
           // Reset mode: Atomic operation to read and clear the file
           try {
             await fs.rename(logFilePath, tempPath);
-
+            
             // Create new empty log file immediately
             await fs.writeFile(logFilePath, '', 'utf8').catch(() => {});
-
+            
             // Read from temp file and clean up
             try {
               logs = await fs.readFile(tempPath, 'utf8');
               await fs.unlink(tempPath).catch(() => {}); // Clean up temp file
-            } catch {
+            } catch (error) {
               // If we can't read temp file, at least clean it up
               await fs.unlink(tempPath).catch(() => {});
               logs = '';
             }
-          } catch (error: unknown) {
+          } catch (error) {
             // File doesn't exist yet, return empty
-            const fsError = error as { code?: string };
-            if (fsError?.code === 'ENOENT') {
+            if ((error as any).code === 'ENOENT') {
               logs = '';
             } else {
               throw error;
@@ -882,10 +814,9 @@ class LogCommands {
           // Read-only mode: Just read the file without resetting
           try {
             logs = await fs.readFile(logFilePath, 'utf8');
-          } catch (error: unknown) {
+          } catch (error) {
             // File doesn't exist yet, return empty
-            const fsError = error as { code?: string };
-            if (fsError?.code === 'ENOENT') {
+            if ((error as any).code === 'ENOENT') {
               logs = '';
             } else {
               throw error;
@@ -894,11 +825,6 @@ class LogCommands {
         }
       } finally {
         await releaseLock();
-      }
-      
-      // Filter logs by duration if specified
-      if (options.durationSeconds && options.durationSeconds > 0) {
-        logs = LogCommands.filterLogsByDuration(logs, options.durationSeconds);
       }
       
       if (options.format === 'raw') {
@@ -924,45 +850,12 @@ class LogCommands {
     }
   }
 
-  /**
-   * Filter logs by duration (keep only logs newer than X seconds ago)
-   * Log format: [2025-10-17T05:30:24.985Z] [stdout] content
-   */
-  static filterLogsByDuration(logs: string, durationSeconds: number): string {
-    if (!logs || logs.trim().length === 0) {
-      return logs;
-    }
-
-    const lines = logs.split('\n');
-    const now = Date.now();
-    const cutoffTime = now - (durationSeconds * 1000);
-    
-    const filteredLines = lines.filter(line => {
-      // Match log format: [ISO_TIMESTAMP] [stream] content
-      const timestampMatch = line.match(/^\[([^\]]+)\]/);
-      if (!timestampMatch) {
-        // If no timestamp, keep the line (might be continuation of previous log)
-        return true;
-      }
-      
-      try {
-        const timestamp = new Date(timestampMatch[1]).getTime();
-        return timestamp >= cutoffTime;
-      } catch (error) {
-        // If timestamp parsing fails, keep the line
-        return true;
-      }
-    });
-    
-    return filteredLines.join('\n');
-  }
-
   static async stats(options: { instanceId: string; dbPath?: string }): Promise<void> {
     const storage = new StorageManager(undefined, options.dbPath);
     
     try {
       const result = storage.getLogStats(options.instanceId);
-      if (!result.success && 'error' in result) {
+      if (!result.success) {
         throw result.error;
       }
 
@@ -984,7 +877,7 @@ class LogCommands {
       );
       process.exit(1);
     } finally {
-      SafeCleanup.closeStorage(storage);
+      await SafeCleanup.closeStorage(storage);
     }
   }
 
@@ -998,7 +891,7 @@ class LogCommands {
     
     try {
       const result = storage.clearLogs(options.instanceId);
-      if (!result.success && 'error' in result) {
+      if (!result.success) {
         throw result.error;
       }
 
@@ -1020,7 +913,7 @@ class LogCommands {
       );
       process.exit(1);
     } finally {
-      SafeCleanup.closeStorage(storage);
+      await SafeCleanup.closeStorage(storage);
     }
   }
 }
@@ -1110,7 +1003,6 @@ PROCESS START OPTIONS:
   --cwd, -c <path>           Working directory (default: current directory)
   --max-restarts <num>       Maximum restart attempts (default: 3)
   --restart-delay <ms>       Delay between restarts in ms (default: 1000)
-  --health-check-interval <ms> Health check interval in ms (default: 30000)
   --max-errors <num>         Maximum errors to store (default: 1000)
   --retention-days <days>    Error retention period (default: 7)
   --log-retention-hours <h>  Log retention period in hours (default: 168)
@@ -1190,7 +1082,6 @@ async function main() {
         'port': { type: 'string', short: 'p' },
         'max-restarts': { type: 'string' },
         'restart-delay': { type: 'string' },
-        'health-check-interval': { type: 'string' },
         'max-errors': { type: 'string' },
         'retention-days': { type: 'string' },
         'log-retention-hours': { type: 'string' },
@@ -1208,8 +1099,7 @@ async function main() {
         'last-sequence': { type: 'string' },
         'count': { type: 'string' },
         'confirm': { type: 'boolean' },
-        'reset': { type: 'boolean' },
-        'duration': { type: 'string' },
+        'reset': { type: 'boolean' }
       },
       allowPositionals: true
     });
@@ -1255,22 +1145,20 @@ async function handleProcessCommand(subcommand: string, args: Record<string, unk
         OutputFormatter.formatError('No command specified to monitor');
         process.exit(1);
       }
-
+      
       const instanceId = String(args['instance-id'] || process.env.INSTANCE_ID || `instance-${Date.now()}`);
-      validateInstanceId(instanceId);
-
+      
       await ProcessCommands.start({
         instanceId,
         command: remainingArgs[0],
         args: remainingArgs.slice(1),
         cwd: args.cwd ? String(args.cwd) : undefined,
         port: args.port ? String(args.port) : undefined,
-        healthCheckInterval: parseIntArg(args, 'health-check-interval'),
-        maxRestarts: parseIntArg(args, 'max-restarts'),
-        restartDelay: parseIntArg(args, 'restart-delay'),
-        maxErrors: parseIntArg(args, 'max-errors'),
-        retentionDays: parseIntArg(args, 'retention-days'),
-        logRetentionHours: parseIntArg(args, 'log-retention-hours')
+        maxRestarts: args['max-restarts'] ? parseInt(String(args['max-restarts'])) : undefined,
+        restartDelay: args['restart-delay'] ? parseInt(String(args['restart-delay'])) : undefined,
+        maxErrors: args['max-errors'] ? parseInt(String(args['max-errors'])) : undefined,
+        retentionDays: args['retention-days'] ? parseInt(String(args['retention-days'])) : undefined,
+        logRetentionHours: args['log-retention-hours'] ? parseInt(String(args['log-retention-hours'])) : undefined
       });
       break;
       
@@ -1305,16 +1193,15 @@ async function handleErrorCommand(subcommand: string, args: Record<string, unkno
         OutputFormatter.formatError('--instance-id is required for list command');
         process.exit(1);
       }
-      validateInstanceId(String(args['instance-id']));
-
+      
       await ErrorCommands.list({
         instanceId: String(args['instance-id']),
-        minLevel: parseIntArg(args, 'min-level'),
-        maxLevel: parseIntArg(args, 'max-level'),
+        minLevel: args['min-level'] ? parseInt(String(args['min-level'])) : undefined,
+        maxLevel: args['max-level'] ? parseInt(String(args['max-level'])) : undefined,
         since: args.since ? String(args.since) : undefined,
         until: args.until ? String(args.until) : undefined,
-        limit: parseIntArg(args, 'limit'),
-        offset: parseIntArg(args, 'offset'),
+        limit: args.limit ? parseInt(String(args.limit)) : undefined,
+        offset: args.offset ? parseInt(String(args.offset)) : undefined,
         format: args.format as 'json' | 'table' | 'raw',
         dbPath: args['db-path'] ? String(args['db-path']) : undefined,
         reset: Boolean(args.reset)
@@ -1359,33 +1246,30 @@ async function handleLogCommand(subcommand: string, args: Record<string, unknown
         OutputFormatter.formatError('--instance-id is required for list command');
         process.exit(1);
       }
-      validateInstanceId(String(args['instance-id']));
-
+      
       await LogCommands.list({
         instanceId: String(args['instance-id']),
         levels: args.levels ? String(args.levels).split(',') as LogLevel[] : undefined,
         streams: args.streams ? String(args.streams).split(',') as ('stdout' | 'stderr')[] : undefined,
         since: args.since ? String(args.since) : undefined,
         until: args.until ? String(args.until) : undefined,
-        limit: parseIntArg(args, 'limit'),
-        offset: parseIntArg(args, 'offset'),
+        limit: args.limit ? parseInt(String(args.limit)) : undefined,
+        offset: args.offset ? parseInt(String(args.offset)) : undefined,
         format: args.format as 'json' | 'table' | 'raw',
         dbPath: args['db-path'] ? String(args['db-path']) : undefined
       });
       break;
-
+      
     case 'get':
       if (!args['instance-id']) {
         OutputFormatter.formatError('--instance-id is required for get command');
         process.exit(1);
       }
-      validateInstanceId(String(args['instance-id']));
-
+      
       await LogCommands.get({
         instanceId: String(args['instance-id']),
         format: args.format as 'json' | 'raw',
-        reset: Boolean(args.reset),
-        durationSeconds: parseIntArg(args, 'duration')
+        reset: Boolean(args.reset)
       });
       break;
       

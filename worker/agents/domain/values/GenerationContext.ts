@@ -1,101 +1,71 @@
-import { PhasicBlueprint, AgenticBlueprint } from '../../schemas';
+import { Blueprint } from '../../schemas';
 import { FileTreeNode, TemplateDetails } from '../../../services/sandbox/sandboxTypes';
-import { FileState, PhaseState, PhasicState, AgenticState } from '../../core/state';
+import { CodeGenState, FileState, PhaseState } from '../../core/state';
 import { DependencyManagement } from '../pure/DependencyManagement';
 import type { StructuredLogger } from '../../../logger';
 import { FileProcessing } from '../pure/FileProcessing';
-import { Plan } from '../../core/types';
-
-/** Common fields shared by all generation contexts */
-interface BaseGenerationContext {
-    readonly query: string;
-    readonly allFiles: FileState[];
-    readonly templateDetails: TemplateDetails;
-    readonly dependencies: Record<string, string>;
-    readonly commandsHistory: string[];
-}
-
-/** Phase-based generation context with detailed blueprint */
-export interface PhasicGenerationContext extends BaseGenerationContext {
-    readonly blueprint: PhasicBlueprint;
-    readonly generatedPhases: PhaseState[];
-}
-
-/** Plan-based generation context with simple blueprint */
-export interface AgenticGenerationContext extends BaseGenerationContext {
-    readonly blueprint: AgenticBlueprint;
-    readonly currentPlan: Plan;
-}
 
 /**
- * Discriminated union of generation contexts
- * 
- * Discriminate using: `'generatedPhases' in context` or `GenerationContext.isPhasic(context)`
+ * Immutable context for code generation operations
+ * Contains all necessary data for generating code
  */
-export type GenerationContext = PhasicGenerationContext | AgenticGenerationContext;
+export class GenerationContext {
+    constructor(
+        public readonly query: string,
+        public readonly blueprint: Blueprint,
+        public readonly templateDetails: TemplateDetails,
+        public readonly dependencies: Record<string, string>,
+        public readonly allFiles: FileState[],
+        public readonly generatedPhases: PhaseState[],
+        public readonly commandsHistory: string[],
+        public readonly customData?: any
+    ) {
+        // Freeze to ensure immutability
+        Object.freeze(this);
+        Object.freeze(this.dependencies);
+        Object.freeze(this.allFiles);
+        Object.freeze(this.generatedPhases);
+        Object.freeze(this.commandsHistory);
+    }
 
-/** Generation context utility functions */
-export const GenerationContext = {
-    /** Create immutable context from agent state */
-    from(
-        state: PhasicState | AgenticState,
-        templateDetails: TemplateDetails,
-        logger?: Pick<StructuredLogger, 'info' | 'warn'>
-    ): GenerationContext {
+    /**
+     * Create context from current state
+     */
+    static from(state: CodeGenState, logger?: Pick<StructuredLogger, 'info' | 'warn'>): GenerationContext {
         const dependencies = DependencyManagement.mergeDependencies(
-            templateDetails.deps || {},
+            state.templateDetails?.deps || {},
             state.lastPackageJson,
             logger
         );
 
-        const allFiles = FileProcessing.getAllRelevantFiles(
-            templateDetails,
+        const allFiles = FileProcessing.getAllFiles(
+            state.templateDetails,
             state.generatedFilesMap
         );
 
-        const base = {
-            query: state.query,
-            allFiles,
-            templateDetails,
+        return new GenerationContext(
+            state.query,
+            state.blueprint,
+            state.templateDetails,
             dependencies,
-            commandsHistory: state.commandsHistory || [],
-        };
+            allFiles,
+            state.generatedPhases,
+            state.commandsHistory || [],
+    undefined
+        );
+    }
 
-        return state.behaviorType === 'phasic'
-            ? Object.freeze({
-                ...base,
-                blueprint: (state as PhasicState).blueprint,
-                generatedPhases: (state as PhasicState).generatedPhases,
-            })
-            : Object.freeze({
-                ...base,
-                blueprint: (state as AgenticState).blueprint,
-                currentPlan: (state as AgenticState).currentPlan,
-            });
-    },
+    /**
+     * Get formatted phases for prompt generation
+     */
+    getCompletedPhases() {
+        return Object.values(this.generatedPhases.filter(phase => phase.completed));
+    }
 
-    /** Type guard for phasic context */
-    isPhasic(context: GenerationContext): context is PhasicGenerationContext {
-        return 'generatedPhases' in context;
-    },
+    getFileTree(): FileTreeNode {
+        const builder = new FileTreeBuilder(this.templateDetails?.fileTree);
 
-    /** Type guard for agentic context */
-    isAgentic(context: GenerationContext): context is AgenticGenerationContext {
-        return 'currentPlan' in context;
-    },
-
-    /** Get completed phases (empty array for agentic contexts) */
-    getCompletedPhases(context: GenerationContext): PhaseState[] {
-        return this.isPhasic(context)
-            ? context.generatedPhases.filter(phase => phase.completed)
-            : [];
-    },
-
-    /** Build file tree from context files */
-    getFileTree(context: GenerationContext): FileTreeNode {
-        const builder = new FileTreeBuilder(context.templateDetails?.fileTree);
-
-        for (const { filePath } of context.allFiles) {
+        for (const { filePath } of this.allFiles) {
             const normalized = FileTreeBuilder.normalizePath(filePath);
             if (normalized) {
                 builder.addFile(normalized);
@@ -103,29 +73,8 @@ export const GenerationContext = {
         }
 
         return builder.build();
-    },
-
-    /** Get phasic blueprint if available */
-    getPhasicBlueprint(context: GenerationContext): PhasicBlueprint | undefined {
-        return this.isPhasic(context) ? context.blueprint : undefined;
-    },
-
-    /** Get agentic blueprint if available */
-    getAgenticBlueprint(context: GenerationContext): AgenticBlueprint | undefined {
-        return this.isAgentic(context) ? context.blueprint : undefined;
-    },
-
-    /** Get common blueprint data */
-    getCommonBlueprintData(context: GenerationContext) {
-        return {
-            title: context.blueprint.title,
-            projectName: context.blueprint.projectName,
-            description: context.blueprint.description,
-            frameworks: context.blueprint.frameworks,
-            colorPalette: context.blueprint.colorPalette,
-        };
-    },
-} as const;
+    }
+}
 
 class FileTreeBuilder {
     private readonly directoryIndex = new Map<string, FileTreeNode>();

@@ -60,7 +60,7 @@ class SetupManager {
 	});
 
 	constructor() {
-		console.log('🚀 VibeSDK Development Setup');
+		console.log('🚀 VibSDK Development Setup');
 		console.log('============================\n');
 	}
 
@@ -70,30 +70,30 @@ class SetupManager {
 			this.loadExistingConfig();
 			await this.collectUserConfig();
 			await this.initializeCloudflareClient();
-
+			
 			const resources = await this.validateAndSetupResources();
-
+			
 			await this.safeExecute('generate .dev.vars file', () => this.generateDevVarsFile());
 			if (this.config.setupRemote) {
 				await this.safeExecute('generate .prod.vars file', () => this.generateProdVarsFile());
 			}
 			await this.safeExecute('update wrangler.jsonc', () => this.updateWranglerConfig(resources));
 			await this.safeExecute('update vite.config.ts', () => this.updateViteConfig());
-
+			
 			const report = await this.generateReadinessReport(resources);
-
+			
 			// Setup AI Gateway if configured
 			if (this.config.useAIGateway) {
 				await this.safeExecute('setup AI Gateway', () => this.ensureAIGateway(resources));
 			}
-
+			
 			// Update worker configuration for custom providers
 			if (this.config.customProviderKeys && this.config.customProviderKeys.length > 0) {
 				await this.safeExecute('update worker configuration', () => this.updateWorkerConfiguration());
 			}
-
+			
 			await this.patchDockerfileForARM64();
-
+			
 			this.displayFinalReport(report, resources);
 		} catch (error) {
 			console.error('\n❌ Setup encountered a critical error:', error instanceof Error ? error.message : String(error));
@@ -130,10 +130,10 @@ class SetupManager {
 		} else if (hasNpm) {
 			console.log('✅ npm is available');
 			console.log('📥 Installing Bun for better performance...');
-
+			
 			try {
 				execSync('curl -fsSL https://bun.sh/install | bash', { stdio: 'inherit' });
-
+				
 				if (await this.checkCommandExists('bun')) {
 					console.log('✅ Bun installed successfully!');
 					this.packageManager = 'bun';
@@ -165,19 +165,19 @@ class SetupManager {
 	private loadExistingConfig(): void {
 		const devVarsPath = join(PROJECT_ROOT, '.dev.vars');
 		const prodVarsPath = join(PROJECT_ROOT, '.prod.vars');
-
+		
 		// Load .dev.vars
 		if (existsSync(devVarsPath)) {
 			console.log('📄 Found existing .dev.vars file - reading current configuration...');
 			this.parseConfigFile(devVarsPath);
 		}
-
+		
 		// Load .prod.vars for production config
 		if (existsSync(prodVarsPath)) {
 			console.log('📄 Found existing .prod.vars file - reading production configuration...');
 			this.parseConfigFile(prodVarsPath);
 		}
-
+		
 		if (!existsSync(devVarsPath) && !existsSync(prodVarsPath)) {
 			console.log('📄 No existing configuration files found - starting fresh setup');
 			return;
@@ -189,12 +189,12 @@ class SetupManager {
 			console.log('   Will only prompt for missing or updated values\n');
 		}
 	}
-
+	
 	private parseConfigFile(filePath: string): void {
 		try {
 			const content = readFileSync(filePath, 'utf-8');
 			const lines = content.split('\n');
-
+			
 			for (const line of lines) {
 				const trimmed = line.trim();
 				if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
@@ -229,10 +229,10 @@ class SetupManager {
 
 	private maskSensitiveValue(question: string, value: string): string {
 		const sensitivePatterns = ['TOKEN', 'SECRET', 'KEY', 'PASSWORD'];
-		const isSensitive = sensitivePatterns.some(pattern =>
+		const isSensitive = sensitivePatterns.some(pattern => 
 			question.toUpperCase().includes(pattern)
 		);
-
+		
 		if (isSensitive && value.length > 8) {
 			return `${value.substring(0, 4)}...${value.substring(value.length - 4)}`;
 		}
@@ -265,35 +265,35 @@ class SetupManager {
 		console.log('\n🌐 Domain Configuration');
 		console.log('A custom domain is required for production deployment and remote resource access.');
 		console.log('Without a custom domain, only local development will be available.\n');
-
+		
 		let customDomain: string | undefined;
 		let useRemoteBindings = false;
 		let setupRemote = false;
 		let prodDomain: string | undefined;
-
+		
 		// Check if we already have a production domain configured
-		const existingProdDomain = this.existingConfig.CUSTOM_DOMAIN &&
-			this.existingConfig.CUSTOM_DOMAIN !== 'localhost:5173' ?
+		const existingProdDomain = this.existingConfig.CUSTOM_DOMAIN && 
+			this.existingConfig.CUSTOM_DOMAIN !== 'localhost:5173' ? 
 			this.existingConfig.CUSTOM_DOMAIN : undefined;
-
+		
 		while (true) {
 			customDomain = await this.promptWithDefault(
 				'Enter your custom domain (or press Enter to skip): ',
 				existingProdDomain || this.existingConfig.CUSTOM_DOMAIN
 			);
-
+			
 			if (!customDomain || customDomain.trim() === '' || customDomain === 'localhost:5173') {
 				console.log('\n⚠️  No custom domain provided.');
 				console.log('   • Remote Cloudflare resources: Not available');
 				console.log('   • Production deployment: Not available');
 				console.log('   • Only local development will be configured\n');
-
+				
 				const continueChoice = await this.prompt('Continue with local-only setup? (Y/n): ');
 				if (continueChoice.toLowerCase() === 'n') {
 					console.log('Please provide a custom domain:\n');
 					continue;
 				}
-
+				
 				customDomain = 'localhost:5173';
 				useRemoteBindings = false;
 				setupRemote = false;
@@ -301,25 +301,25 @@ class SetupManager {
 			} else {
 				console.log(`✅ Custom domain set: ${customDomain}`);
 				prodDomain = customDomain; // Use same domain for production
-
+				
 				// Ask about remote resources
 				const remoteChoice = await this.prompt('Use remote Cloudflare resources (KV, D1, R2, etc.)? (Y/n): ');
 				useRemoteBindings = remoteChoice.toLowerCase() !== 'n';
-
+				
 				// Ask about production setup
 				const prodChoice = await this.prompt('Configure for production deployment? (Y/n): ');
 				setupRemote = prodChoice.toLowerCase() !== 'n';
-
+				
 				if (useRemoteBindings) {
 					console.log('✅ Remote Cloudflare resources will be used');
 				} else {
 					console.log('✅ Local-only bindings selected');
 				}
-
+				
 				break;
 			}
 		}
-
+		
 		const finalDomain = customDomain || 'localhost:5173';
 
 		// AI Gateway configuration
@@ -333,35 +333,13 @@ class SetupManager {
 		let customProviderKeys: Array<{key: string, provider: string}> = [];
 
 		if (useAIGateway) {
+			// Auto-set AI Gateway token to API token
 			console.log('✅ AI Gateway enabled - will auto-configure CLOUDFLARE_AI_GATEWAY_TOKEN');
-
-			// Generate suggested URL
-			const wranglerConfig = this.parseWranglerConfig();
-			const gatewayName = wranglerConfig.vars?.CLOUDFLARE_AI_GATEWAY || 'vibesdk-gateway';
-			const suggestedUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayName}/`;
-
-			// Use existing URL if available, otherwise use suggested URL as default
-			const existingUrl = this.existingConfig.CLOUDFLARE_AI_GATEWAY_URL;
-			const defaultUrl = existingUrl || suggestedUrl;
-
-			if (!existingUrl) {
-				console.log(`\n💡 AI Gateway URL format: https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_name>/`);
-				console.log(`   Suggested: ${suggestedUrl}`);
-			}
-
-			aiGatewayUrl = await this.promptWithDefault(
-				'Enter AI Gateway URL: ',
-				defaultUrl
-			);
-
-			if (!aiGatewayUrl || aiGatewayUrl.trim() === '') {
-				throw new Error('AI Gateway URL is required when AI Gateway is enabled');
-			}
 		} else {
 			console.log('\n⚠️  WARNING: Without AI Gateway, you MUST manually edit worker/agents/inferutils/config.ts');
 			console.log('   to configure your models. Model names should be in format: "<provider-name>/<model-name>"');
 			console.log('   Example: "openai/gpt-4" or "anthropic/claude-3-5-sonnet"\n');
-
+			
 			aiGatewayUrl = await this.prompt('Enter custom OpenAI-compatible URL (optional): ');
 		}
 
@@ -377,7 +355,7 @@ class SetupManager {
 
 		const providerChoice = await this.prompt('Select providers (comma-separated numbers, e.g., 1,2,3): ');
 		const selectedProviders = providerChoice.split(',').map(n => parseInt(n.trim())).filter(n => n >= 1 && n <= 6);
-
+		
 		if (selectedProviders.length === 0) {
 			console.log('⚠️  No providers selected - you MUST configure at least one provider!');
 			console.log('   Adding Google AI Studio as default...');
@@ -434,7 +412,7 @@ class SetupManager {
 		console.log('   • Google: For Google OAuth user login');
 		console.log('   • GitHub: For GitHub OAuth user login');
 		console.log('   • GitHub Export: For exporting generated apps to GitHub repositories\n');
-
+		
 		const otherVars = [
 			'GOOGLE_CLIENT_ID',
 			'GOOGLE_CLIENT_SECRET',
@@ -456,8 +434,8 @@ class SetupManager {
 		if (providedProviders.length > 0) {
 			console.log(`\n✅ API keys configured for: ${providedProviders.join(', ')}`);
 		}
-
-		if (!providedProviders.includes('google-ai-studio')) {
+		
+		if (!providedProviders.includes('google_ai_studio')) {
 			console.log('\n⚠️  No Google AI Studio key provided.');
 			console.log('   You may need to update model configs in worker/agents/inferutils/config.ts');
 			console.log('   to use alternative models (OpenAI, Anthropic, etc.) for Gemini fallbacks.');
@@ -504,7 +482,7 @@ class SetupManager {
 
 	private async initializeCloudflareClient(): Promise<void> {
 		console.log('🔐 Validating Cloudflare credentials...');
-
+		
 		this.cloudflare = new Cloudflare({
 			apiToken: this.config.apiToken,
 		});
@@ -520,7 +498,7 @@ class SetupManager {
 
 	private async validateAndSetupResources(): Promise<ResourceInfo> {
 		console.log('🔍 Validating and setting up Cloudflare resources...');
-
+		
 		const wranglerConfig = this.parseWranglerConfig();
 		const resources: ResourceInfo = {
 			kvNamespaces: [],
@@ -532,13 +510,13 @@ class SetupManager {
 
 		await this.processKVNamespaces(wranglerConfig, resources);
 		await this.processD1Databases(wranglerConfig, resources);
-
+		
 		await this.safeExecute('setup database', () => this.setupDatabase(resources));
-
+		
 		await this.processR2Buckets(wranglerConfig, resources);
-
+		
 		await this.safeExecute('deploy templates', () => this.deployTemplates(resources));
-
+		
 		await this.processDispatchNamespaces(wranglerConfig, resources);
 		await this.processCustomDomain(resources);
 
@@ -629,8 +607,8 @@ class SetupManager {
 
 	private async processCustomDomain(resources: ResourceInfo): Promise<void> {
 		// Check production domain first (priority for zone detection)
-		const domainToCheck = this.config.setupRemote && this.config.prodDomain
-			? this.config.prodDomain
+		const domainToCheck = this.config.setupRemote && this.config.prodDomain 
+			? this.config.prodDomain 
 			: (this.config.customDomain !== 'localhost:5173' ? this.config.customDomain : null);
 
 		if (domainToCheck) {
@@ -654,7 +632,7 @@ class SetupManager {
 	private handleResourceError(resourceType: string, resourceName: string, error: unknown, specificMessage?: string): void {
 		const errorMsg = `Failed to setup ${resourceType} ${resourceName}: ${error instanceof Error ? error.message : String(error)}`;
 		console.warn(`⚠️  ${errorMsg} - will use local-only mode`);
-
+		
 		if (specificMessage && error instanceof Error && error.message.includes('Unauthorized')) {
 			console.warn(`💡 ${specificMessage}`);
 			console.warn('   Will continue with local-only for development');
@@ -663,7 +641,7 @@ class SetupManager {
 
 	private async ensureKVNamespace(binding: string): Promise<{ id: string; title: string }> {
 		const namespaceName = `vibesdk-${binding.toLowerCase()}-local`;
-
+		
 		try {
 			// Check if namespace exists using direct API call
 			const response = await fetch(
@@ -753,7 +731,7 @@ class SetupManager {
 	private async ensureDispatchNamespace(namespaceName: string, binding: string): Promise<void> {
 		try {
 			console.log(`🔍 Checking dispatch namespace: ${namespaceName}`);
-
+			
 			// Use wrangler CLI to check if namespace exists
 			try {
 				execSync(`wrangler dispatch-namespace get ${namespaceName}`, {
@@ -769,7 +747,7 @@ class SetupManager {
 			} catch (error) {
 				// If namespace doesn't exist, create it
 				console.log(`📦 Creating dispatch namespace: ${namespaceName}`);
-
+				
 				execSync(`wrangler dispatch-namespace create ${namespaceName}`, {
 					stdio: 'pipe',
 					env: {
@@ -778,18 +756,18 @@ class SetupManager {
 						CLOUDFLARE_ACCOUNT_ID: this.config.accountId,
 					},
 				});
-
+				
 				console.log(`✅ Created dispatch namespace: ${namespaceName}`);
 			}
 		} catch (error) {
 			// Handle wrangler CLI errors gracefully
 			const stderr = error instanceof Error && 'stderr' in error ? (error as any).stderr?.toString() : '';
-
-			if (stderr.includes('You do not have access to dispatch namespaces') ||
+			
+			if (stderr.includes('You do not have access to dispatch namespaces') || 
 				stderr.includes('not available')) {
 				throw new Error('Dispatch namespaces not available on this account plan');
 			}
-
+			
 			throw new Error(`Wrangler CLI error: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
@@ -837,7 +815,7 @@ class SetupManager {
 
 	private async ensureAIGateway(resources: ResourceInfo): Promise<void> {
 		const gatewayName = this.config.useAIGateway ? 'vibesdk-gateway' : null;
-
+		
 		if (!gatewayName) {
 			console.log('ℹ️  AI Gateway setup skipped (not configured)');
 			return;
@@ -851,47 +829,14 @@ class SetupManager {
 		try {
 			// Check API token permissions first
 			console.log('🔍 Checking API token permissions...');
-			const permissionCheck = await this.checkTokenPermissions();
-
-			// Check if token already exists in config
-			const existingToken = this.config.devVars.CLOUDFLARE_AI_GATEWAY_TOKEN;
-			const hasExistingToken = existingToken && existingToken !== 'optional-your-cf-ai-gateway-token';
-
-			if (hasExistingToken) {
-				// Use existing configured token
-				aiGatewayToken = existingToken;
-				console.log('✅ Using existing AI Gateway token from configuration');
-			} else if (permissionCheck.hasAIGatewayAccess) {
-				// Main token has permissions, use it directly - no need to create a specialized token
-				aiGatewayToken = this.config.apiToken;
-				this.config.devVars.CLOUDFLARE_AI_GATEWAY_TOKEN = this.config.apiToken;
-				console.log('✅ Main API token has AI Gateway permissions, using it directly');
-			} else {
-				// Main token doesn't have permissions, try to create a specialized token
-				console.log('🔐 Main token lacks AI Gateway permissions, creating specialized token...');
-				try {
-					aiGatewayToken = await this.ensureAIGatewayToken();
-					tokenCreated = !!aiGatewayToken;
-					
-					if (aiGatewayToken) {
-						this.config.devVars.CLOUDFLARE_AI_GATEWAY_TOKEN = aiGatewayToken;
-						console.log('✅ Created and using specialized AI Gateway token');
-					} else {
-						// Specialized token creation failed, fallback to main token with warning
-						console.warn('⚠️  WARNING: Specialized token creation failed');
-						console.warn('   Falling back to main API token, but it may not have AI Gateway permissions!');
-						console.warn('   You may experience 401 errors when using AI Gateway.');
-						console.warn('   Please verify your token has: AI Gateway Read, Edit, and Run permissions.');
-						this.config.devVars.CLOUDFLARE_AI_GATEWAY_TOKEN = this.config.apiToken;
-						aiGatewayToken = this.config.apiToken;
-					}
-				} catch (tokenErr) {
-					tokenError = tokenErr instanceof Error ? tokenErr.message : String(tokenErr);
-					console.warn(`⚠️  Token creation failed: ${tokenError}`);
-					console.warn('   Falling back to main API token');
-					this.config.devVars.CLOUDFLARE_AI_GATEWAY_TOKEN = this.config.apiToken;
-					aiGatewayToken = this.config.apiToken;
-				}
+			await this.checkTokenPermissions();
+			
+			try {
+				aiGatewayToken = await this.ensureAIGatewayToken();
+				tokenCreated = !!aiGatewayToken;
+			} catch (tokenErr) {
+				tokenError = tokenErr instanceof Error ? tokenErr.message : String(tokenErr);
+				console.warn(`⚠️  Token creation issue: ${tokenError}`);
 			}
 
 			// Check if gateway exists first
@@ -946,80 +891,19 @@ class SetupManager {
 
 	private async checkTokenPermissions(): Promise<{ hasAIGatewayAccess: boolean; tokenInfo?: any }> {
 		try {
-			// Step 1: Verify the token is valid and active
 			const verifyResponse = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
 				headers: { Authorization: `Bearer ${this.config.apiToken}` },
 			});
 
 			if (!verifyResponse.ok) {
-				console.warn('⚠️  Could not verify API token');
+				console.warn('⚠️  Could not verify API token permissions');
 				return { hasAIGatewayAccess: false };
 			}
 
-			const verifyData = await verifyResponse.json();
-			const tokenStatus = verifyData.result?.status;
-
-			if (tokenStatus !== 'active') {
-				console.warn('⚠️  API token is not active');
-				return { hasAIGatewayAccess: false };
-			}
-
-			console.log('✅ API token is active and valid');
-
-			// Step 2: Check what AI Gateway permission groups exist (doesn't require special permissions)
-			try {
-				const permGroupsResponse = await fetch('https://api.cloudflare.com/client/v4/user/tokens/permission_groups?name=AI%20Gateway', {
-					headers: { Authorization: `Bearer ${this.config.apiToken}` },
-				});
-
-				if (permGroupsResponse.ok) {
-					const permData = await permGroupsResponse.json();
-					const aiGatewayPerms = permData.result || [];
-					if (aiGatewayPerms.length > 0) {
-						console.log(`ℹ️  Found ${aiGatewayPerms.length} AI Gateway permission group(s):`);
-						aiGatewayPerms.forEach((perm: any) => {
-							console.log(`   • ${perm.name} (${perm.id})`);
-						});
-					}
-				}
-			} catch (e) {
-				// Non-critical - just for informational purposes
-			}
-
-			// Step 3: Test AI Gateway Read permission by listing gateways
-			// Note: We can only test Read permission without side effects
-			// Edit permission will be tested at runtime when actually creating the gateway
-			const testResponse = await fetch(`https://api.cloudflare.com/client/v4/accounts/${this.config.accountId}/ai-gateway/gateways`, {
-				headers: { Authorization: `Bearer ${this.config.apiToken}` },
-			});
-
-			if (testResponse.ok) {
-				console.log('✅ Token has AI Gateway Read permission');
-				console.log('   Note: Edit permission will be verified when creating gateway');
-				return { hasAIGatewayAccess: true, tokenInfo: verifyData.result };
-			}
-
-			// Check specific error codes
-			if (testResponse.status === 403) {
-				console.warn('⚠️  Token does NOT have AI Gateway permissions (403 Forbidden)');
-				console.warn('   Required: AI Gateway Read + Edit + Run');
-				return { hasAIGatewayAccess: false, tokenInfo: verifyData.result };
-			}
-
-			if (testResponse.status === 404) {
-				// 404 means endpoint accessible but no gateways exist - token has Read permission
-				console.log('✅ Token has AI Gateway Read permission (no gateways yet)');
-				console.log('   Note: Edit permission will be verified when creating gateway');
-				return { hasAIGatewayAccess: true, tokenInfo: verifyData.result };
-			}
-
-			// Other errors - assume no access
-			console.warn(`⚠️  AI Gateway permission test failed with status ${testResponse.status}`);
-			console.warn('   Assuming no AI Gateway permissions');
-			return { hasAIGatewayAccess: false, tokenInfo: verifyData.result };
-
+			const data = await verifyResponse.json();
+			return { hasAIGatewayAccess: true, tokenInfo: data.result };
 		} catch (error) {
-			console.warn(`⚠️  Token permission check failed: ${error instanceof Error ? error.message : String(error)}`);
+			console.warn('⚠️  Token verification failed');
 			return { hasAIGatewayAccess: false };
 		}
 	}
@@ -1071,7 +955,7 @@ class SetupManager {
 				console.log(`   Token ID: ${tokenData.result.id}`);
 				console.warn('⚠️  Please save this token and add it to CLOUDFLARE_AI_GATEWAY_TOKEN:');
 				console.warn(`   ${newToken}`);
-
+				
 				// Initialize AI Gateway SDK with new token
 				this.aiGatewayCloudflare = new Cloudflare({ apiToken: newToken });
 				return newToken;
@@ -1146,7 +1030,7 @@ class SetupManager {
 
 	private parseWorkerConfiguration(): Set<string> {
 		const configPath = join(PROJECT_ROOT, 'worker-configuration.d.ts');
-
+		
 		if (!existsSync(configPath)) {
 			console.warn('⚠️  worker-configuration.d.ts not found, using fallback variable list');
 			return SetupManager.FALLBACK_WORKER_VARS;
@@ -1155,19 +1039,19 @@ class SetupManager {
 		try {
 			const content = readFileSync(configPath, 'utf-8');
 			const envInterfaceMatch = content.match(/interface Env \{([\s\S]*?)\}/);
-
+			
 			if (envInterfaceMatch) {
 				const managedVars = new Set<string>();
 				const lines = envInterfaceMatch[1].split('\n');
-
+				
 				for (const line of lines) {
 					const match = line.trim().match(/^([A-Z_][A-Z0-9_]*)\s*:\s*(string|"[^"]*");?$/);
 					if (match) managedVars.add(match[1]);
 				}
-
+				
 				return managedVars;
 			}
-
+			
 			return SetupManager.FALLBACK_WORKER_VARS;
 		} catch (error) {
 			console.warn(`⚠️  Could not parse worker-configuration.d.ts: ${error instanceof Error ? error.message : String(error)}`);
@@ -1179,10 +1063,10 @@ class SetupManager {
 		console.log('📝 Generating .dev.vars file...');
 
 		const devVarsPath = join(PROJECT_ROOT, '.dev.vars');
-
+		
 		// Parse worker-configuration.d.ts to get all managed variables
 		const managedVars = this.parseWorkerConfiguration();
-
+		
 		// Read existing .dev.vars file to preserve values
 		const existingVars = new Map<string, string>();
 		if (existsSync(devVarsPath)) {
@@ -1267,7 +1151,7 @@ class SetupManager {
 				content += `#${varName}=""\n`;
 			}
 		}
-
+		
 		// GitHub Exporter Configuration (if configured)
 		if (this.config.devVars.GITHUB_EXPORTER_CLIENT_ID || this.config.devVars.GITHUB_EXPORTER_CLIENT_SECRET) {
 			content += '\n# GitHub Exporter OAuth Configuration\n';
@@ -1280,9 +1164,6 @@ class SetupManager {
 		content += '# Required secrets\n';
 		content += `JWT_SECRET="${this.config.devVars.JWT_SECRET}"\n`;
 		content += `WEBHOOK_SECRET="${this.config.devVars.WEBHOOK_SECRET}"\n`;
-		if (this.config.devVars.USE_TUNNEL_FOR_PREVIEW) {
-			content += `USE_TUNNEL_FOR_PREVIEW="${this.config.devVars.USE_TUNNEL_FOR_PREVIEW}"\n`;
-		}
 
 		// Worker configuration variables (preserved from existing .dev.vars)
 		if (workerConfigVarsToPreserve.size > 0) {
@@ -1295,10 +1176,10 @@ class SetupManager {
 		}
 
 		// Additional worker config variables not yet set (as commented placeholders)
-		const unsetWorkerVars = Array.from(managedVars).filter(varName =>
+		const unsetWorkerVars = Array.from(managedVars).filter(varName => 
 			!setupManagedVars.has(varName) && !workerConfigVarsToPreserve.has(varName)
 		).sort();
-
+		
 		if (unsetWorkerVars.length > 0) {
 			content += '\n# Additional worker configuration variables (uncomment and set as needed)\n';
 			for (const varName of unsetWorkerVars) {
@@ -1316,7 +1197,7 @@ class SetupManager {
 		}
 
 		writeFileSync(devVarsPath, content, 'utf-8');
-
+		
 		const totalPreserved = preservedVars.size + workerConfigVarsToPreserve.size;
 		if (totalPreserved > 0) {
 			console.log(`✅ .dev.vars file updated (preserved ${totalPreserved} existing variables)`);
@@ -1335,10 +1216,10 @@ class SetupManager {
 		if (!this.config.setupRemote || !this.config.prodVars || !this.config.prodDomain) return;
 
 		console.log('📝 Generating .prod.vars file...');
-
+		
 		const prodVarsPath = join(PROJECT_ROOT, '.prod.vars');
 		const managedVars = this.parseWorkerConfiguration();
-
+		
 		const setupManagedVars = new Set([
 			'CUSTOM_DOMAIN', 'ENVIRONMENT', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID',
 			'CLOUDFLARE_AI_GATEWAY_TOKEN', 'CLOUDFLARE_AI_GATEWAY_URL',
@@ -1346,7 +1227,6 @@ class SetupManager {
 			'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET',
 			'GITHUB_EXPORTER_CLIENT_ID', 'GITHUB_EXPORTER_CLIENT_SECRET',
 			'JWT_SECRET', 'WEBHOOK_SECRET'
-			// Note: USE_TUNNEL_FOR_PREVIEW is intentionally excluded - it's dev-only
 		]);
 
 		let content = '';
@@ -1391,7 +1271,7 @@ class SetupManager {
 				content += `#${varName}=""\n`;
 			}
 		}
-
+		
 		// GitHub Exporter Configuration (if configured)
 		if (this.config.prodVars.GITHUB_EXPORTER_CLIENT_ID || this.config.prodVars.GITHUB_EXPORTER_CLIENT_SECRET) {
 			content += '\n# GitHub Exporter OAuth Configuration\n';
@@ -1422,8 +1302,8 @@ class SetupManager {
 			const kvNamespaces = parse(content).kv_namespaces || [];
 			const updatedKvNamespaces = kvNamespaces.map((ns: any) => {
 				if (ns.binding === kv.binding) {
-					return {
-						...ns,
+					return { 
+						...ns, 
 						id: kv.id,
 						remote: kv.accessible  // Set remote based on accessibility
 					};
@@ -1443,8 +1323,8 @@ class SetupManager {
 			const databases = parse(updatedContent).d1_databases || [];
 			const updatedDatabases = databases.map((database: any) => {
 				if (database.binding === db.binding) {
-					return {
-						...database,
+					return { 
+						...database, 
 						database_id: db.id,
 						remote: db.accessible  // Set remote based on accessibility
 					};
@@ -1503,8 +1383,8 @@ class SetupManager {
 
 		// Determine which domain to use in wrangler.jsonc
 		// Priority: Production domain > Custom local domain (if not localhost) > Don't set at all
-		const wranglerDomain = this.config.setupRemote && this.config.prodDomain
-			? this.config.prodDomain
+		const wranglerDomain = this.config.setupRemote && this.config.prodDomain 
+			? this.config.prodDomain 
 			: (this.config.customDomain !== 'localhost:5173' ? this.config.customDomain : null);
 
 		if (wranglerDomain) {
@@ -1532,18 +1412,18 @@ class SetupManager {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, routesEdits);
-
+			
 			// Set workers_dev = false and preview_urls = false for custom domain
 			const workersDevEdits = modify(updatedContent, ['workers_dev'], false, {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, workersDevEdits);
-
+			
 			const previewUrlsEdits = modify(updatedContent, ['preview_urls'], false, {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, previewUrlsEdits);
-
+			
 			console.log(`✅ Updated routes for domain: ${wranglerDomain}`);
 			if (zone) {
 				console.log(`   • Main domain: ${wranglerDomain} (custom_domain: true)`);
@@ -1562,24 +1442,24 @@ class SetupManager {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, routesEdits);
-
+			
 			// Don't set CUSTOM_DOMAIN for localhost (keep it unset or remove it)
 			const varsEdits = modify(updatedContent, ['vars', 'CUSTOM_DOMAIN'], 'localhost:5173', {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, varsEdits);
-
+			
 			// Set workers_dev = true and preview_urls = true for localhost development
 			const workersDevEdits = modify(updatedContent, ['workers_dev'], true, {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, workersDevEdits);
-
+			
 			const previewUrlsEdits = modify(updatedContent, ['preview_urls'], true, {
 				formattingOptions: { insertSpaces: true, tabSize: 4 }
 			});
 			updatedContent = applyEdits(updatedContent, previewUrlsEdits);
-
+			
 			console.log('✅ Configured for localhost development (workers.dev deployment)');
 		}
 
@@ -1597,13 +1477,13 @@ class SetupManager {
 		}
 
 		let content = readFileSync(viteConfigPath, 'utf-8');
-
+		
 		// Update the remoteBindings setting based on user preference
 		const remoteBindingsValue = this.config.useRemoteBindings ? 'true' : 'false';
-
+		
 		// Look for the experimental.remoteBindings setting and update it
 		const remoteBindingsRegex = /experimental:\s*{\s*remoteBindings:\s*(true|false)\s*}/;
-
+		
 		if (remoteBindingsRegex.test(content)) {
 			content = content.replace(
 				remoteBindingsRegex,
@@ -1651,7 +1531,7 @@ class SetupManager {
 			const gateway = resources.aiGateway;
 			const status = gateway.exists ? '✅' : '❌';
 			resourcesCreated.push(`AI Gateway: ${gateway.name} ${status}`);
-
+			
 			if (gateway.tokenError) {
 				issues.push(`AI Gateway token issue: ${gateway.tokenError}`);
 			}
@@ -1736,14 +1616,14 @@ class SetupManager {
 		console.log(`   1. Run \`${this.packageManager} run dev\` to start local development`);
 		console.log('   2. Visit your app at http://localhost:5173');
 		console.log('   3. Database and templates are ready to use!');
-
+		
 		if (this.config.setupRemote && this.config.prodDomain) {
 			console.log(`   4. For production deployment to ${this.config.prodDomain}, run \`npm run deploy\``);
 			console.log('   5. .prod.vars file is ready for production environment variables');
 		} else if (this.config.customDomain && this.config.customDomain !== 'localhost:5173') {
 			console.log('   4. For production deployment, run `npm run deploy`');
 		}
-
+		
 		if (!this.config.useRemoteBindings) {
 			console.log('\n📝 Local-Only Mode:');
 			console.log('   • All Cloudflare resources configured for local development');
@@ -1753,7 +1633,7 @@ class SetupManager {
 
 		// Additional setup information
 		const hasGoogleAI = Object.keys(this.config.devVars).includes('GOOGLE_AI_STUDIO_API_KEY');
-		const hasOAuth = ['GOOGLE_CLIENT_ID', 'GITHUB_CLIENT_ID', 'GITHUB_EXPORTER_CLIENT_ID'].some(key =>
+		const hasOAuth = ['GOOGLE_CLIENT_ID', 'GITHUB_CLIENT_ID', 'GITHUB_EXPORTER_CLIENT_ID'].some(key => 
 			Object.keys(this.config.devVars).includes(key)
 		);
 		const hasRemoteR2 = resources.r2Buckets.some(bucket => bucket.accessible);
@@ -1761,12 +1641,12 @@ class SetupManager {
 
 		if (!hasGoogleAI || hasOAuth || !hasRemoteR2 || isARM64) {
 			console.log('\n💡 Setup Information:');
-
+			
 			if (!hasGoogleAI) {
 				console.log('   • Edit worker/agents/inferutils/config.ts to configure AI models');
 				console.log('   • Update fallback models from Gemini to your available providers');
 			}
-
+			
 			if (hasOAuth) {
 				console.log('   • OAuth credentials configured - users can now log in');
 				if (Object.keys(this.config.devVars).includes('GITHUB_EXPORTER_CLIENT_ID')) {
@@ -1787,13 +1667,13 @@ class SetupManager {
 				console.log('   • ARM64 flags will be automatically removed during deployment');
 			}
 		}
-
-		console.log('\n✨ Happy coding with VibeSDK! ✨');
+		
+		console.log('\n✨ Happy coding with VibSDK! ✨');
 	}
 
 	private async updateWorkerConfiguration(): Promise<void> {
 		const workerConfigPath = join(PROJECT_ROOT, 'worker-configuration.d.ts');
-
+		
 		if (!existsSync(workerConfigPath) || !this.config.customProviderKeys?.length) {
 			return;
 		}
@@ -1802,7 +1682,7 @@ class SetupManager {
 
 		try {
 			let content = readFileSync(workerConfigPath, 'utf-8');
-
+			
 			// Find the Env interface
 			const envInterfaceMatch = content.match(/interface Env \{([\s\S]*?)\}/);
 			if (!envInterfaceMatch) {
@@ -1826,11 +1706,11 @@ class SetupManager {
 			// Add missing keys to the Env interface
 			const envContent = envInterfaceMatch[1];
 			const lastApiKeyMatch = envContent.match(/.*_API_KEY: string;/g);
-
+			
 			if (lastApiKeyMatch) {
 				const lastApiKeyLine = lastApiKeyMatch[lastApiKeyMatch.length - 1];
 				const insertPoint = content.indexOf(lastApiKeyLine) + lastApiKeyLine.length;
-
+				
 				const newKeys = keysToAdd.map(key => `\n\t\t${key}: string;`).join('');
 				content = content.slice(0, insertPoint) + newKeys + content.slice(insertPoint);
 			}
@@ -1840,7 +1720,7 @@ class SetupManager {
 			if (processEnvMatch) {
 				const existingKeys = processEnvMatch[1];
 				const missingKeys = keysToAdd.filter(key => !existingKeys.includes(key));
-
+				
 				if (missingKeys.length > 0) {
 					const updatedKeys = existingKeys + ' | "' + missingKeys.join('" | "') + '"';
 					content = content.replace(processEnvMatch[0], processEnvMatch[0].replace(existingKeys, updatedKeys));
@@ -1859,7 +1739,7 @@ class SetupManager {
 		// Check if we're running on ARM64 architecture
 		const arch = process.arch;
 		const platform = process.platform;
-
+		
 		if (arch !== 'arm64') {
 			console.log('ℹ️  Non-ARM64 platform detected - no Dockerfile patching needed');
 			return;
@@ -1868,9 +1748,9 @@ class SetupManager {
 		console.log('\n🔧 ARM64 Platform Configuration');
 		console.log('-------------------------------\n');
 		console.log(`🏗️  ARM64 ${platform} detected - patching SandboxDockerfile for local development`);
-
+		
 		const dockerfilePath = join(PROJECT_ROOT, 'SandboxDockerfile');
-
+		
 		if (!existsSync(dockerfilePath)) {
 			console.warn('⚠️  SandboxDockerfile not found - skipping ARM64 patching');
 			return;
@@ -1896,17 +1776,17 @@ class SetupManager {
 			if (modified) {
 				writeFileSync(dockerfilePath, updatedLines.join('\n'), 'utf-8');
 				console.log('✅ SandboxDockerfile patched with ARM64 platform flags');
-
+				
 				console.log('\n⚠️  IMPORTANT ARM64 NOTICE:');
 				console.log('   • SandboxDockerfile has been modified for local ARM64 development');
 				console.log('   • The --platform=linux/arm64 flags are for local development only');
 				console.log('   • These flags will be automatically removed during deployment');
 				console.log('   • Do NOT commit these changes to production repositories');
-
+				
 			} else {
 				console.log('✅ SandboxDockerfile already contains ARM64 platform flags');
 			}
-
+			
 		} catch (error) {
 			console.error('❌ Failed to patch SandboxDockerfile:', error instanceof Error ? error.message : String(error));
 			console.error('   You may need to manually add --platform=linux/arm64 to FROM statements');
@@ -1980,7 +1860,7 @@ class SetupManager {
 
 			// Deploy to local R2 first (always available)
 			console.log(`🚀 Deploying templates to local R2 bucket: ${templatesBucket.bucket_name}`);
-
+			
 			const localDeployEnv = {
 				...process.env,
 				CLOUDFLARE_API_TOKEN: this.config.apiToken,
@@ -2001,7 +1881,7 @@ class SetupManager {
 			// Deploy to remote R2 if available
 			if (hasRemoteR2) {
 				console.log(`🚀 Deploying templates to remote R2 bucket: ${templatesBucket.bucket_name}`);
-
+				
 				const remoteDeployEnv = {
 					...process.env,
 					CLOUDFLARE_API_TOKEN: this.config.apiToken,
@@ -2039,7 +1919,7 @@ class SetupManager {
 			console.error('   3. Ensure deploy_templates.sh script exists in templates repo');
 			console.error('   4. Check R2 bucket access permissions');
 			console.error('\n⚠️  Continuing setup - templates can be deployed manually later');
-
+			
 			if (hasRemoteR2) {
 				console.error(`   Manual command: cd templates && ./deploy_templates.sh`);
 			} else {

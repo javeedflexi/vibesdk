@@ -13,3 +13,4 @@ export { UserService } from './services/UserService';
 export { AppService } from './services/AppService';
 export { ModelConfigService } from './services/ModelConfigService';
 export { ModelTestService } from './services/ModelTestService';
+export { PaymentsService } from './services/PaymentsService';

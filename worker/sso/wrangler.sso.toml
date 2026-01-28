@@ -1,0 +1,44 @@
+name = "devvibe-sso-handoff"
+main = "index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "VIBE_DB"
+database_name = "devvibe-sso-db"
+database_id = "6c73ffd6-b5de-41c7-892f-be8c54e255a3"
+
+[vars]
+FLEXI_JWKS_URL = "https://devapi.flexifunnels.com/.well-known/jwks.json"
+FLEXI_ISS = "flexi"
+FLEXI_AUD = "vibe-handoff"
+VIBE_ISS = "vibe-edge"
+VIBE_AUD = "vibe-app"
+VIBE_COOKIE_NAME = "vibe_access"
+VIBE_COOKIE_DOMAIN = ".flexifunnels.page"
+#Routing
+PROTECTED_PREFIX = "/apps"
+VIBE_ORIGIN = "https://dev-build.flexifunnels.page"
+ALLOW_MIGRATE = "false"
+
+[env.production]
+[[env.production.d1_databases]]
+binding = "VIBE_DB"
+database_name = "devvibe-sso-db"
+database_id = "6c73ffd6-b5de-41c7-892f-be8c54e255a3"
+
+[env.production.vars]
+FLEXI_JWKS_URL = "https://devapi.flexifunnels.com/.well-known/jwks.json"
+FLEXI_ISS = "flexi"
+FLEXI_AUD = "vibe-handoff"
+VIBE_ISS = "vibe-edge"
+VIBE_AUD = "vibe-app"
+VIBE_COOKIE_NAME = "vibe_access"
+VIBE_COOKIE_DOMAIN = ".flexifunnels.page"
+PROTECTED_PREFIX = "/apps"
+VIBE_ORIGIN = "https://dev-build.flexifunnels.page"
+ALLOW_MIGRATE = "false"
+
+routes = [
+  { pattern = "sso.flexifunnels.page/*", zone_name = "flexifunnels.page" }
+]

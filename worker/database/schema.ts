@@ -495,6 +495,65 @@ export const userModelProviders = sqliteTable('user_model_providers', {
 }));
 
 // ========================================
+// PAYMENTS AND TRANSACTIONS
+// ========================================
+
+/**
+ * Payments table - Store all payment transactions and sales data
+ * Used by AI agents to generate reports and analytics apps
+ */
+export const payments = sqliteTable('payments', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+
+    // Transaction Details
+    transactionId: text('transaction_id').unique(), // External transaction ID (Stripe, PayPal, etc.)
+    orderId: text('order_id'), // Associated order ID
+
+    // Payment Information
+    amount: real('amount').notNull(), // Payment amount
+    currency: text('currency').notNull().default('USD'), // Currency code (USD, EUR, etc.)
+    status: text('status', { enum: ['pending', 'completed', 'failed', 'refunded', 'cancelled'] }).notNull().default('pending'),
+    paymentMethod: text('payment_method'), // 'card', 'paypal', 'bank_transfer', etc.
+    paymentProvider: text('payment_provider'), // 'stripe', 'paypal', 'razorpay', etc.
+
+    // Customer Information
+    customerName: text('customer_name'),
+    customerEmail: text('customer_email'),
+    customerPhone: text('customer_phone'),
+
+    // Product/Service Details
+    productName: text('product_name'),
+    productId: text('product_id'),
+    quantity: integer('quantity').default(1),
+
+    // Additional Metadata
+    description: text('description'),
+    metadata: text('metadata', { mode: 'json' }).default('{}'), // Flexible JSON for additional data
+
+    // Refund Information
+    refundedAmount: real('refunded_amount').default(0),
+    refundedAt: integer('refunded_at', { mode: 'timestamp' }),
+    refundReason: text('refund_reason'),
+
+    // Timestamps
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+    paidAt: integer('paid_at', { mode: 'timestamp' }), // When payment was completed
+}, (table) => ({
+    userIdIdx: index('payments_user_id_idx').on(table.userId),
+    statusIdx: index('payments_status_idx').on(table.status),
+    transactionIdIdx: uniqueIndex('payments_transaction_id_idx').on(table.transactionId),
+    orderIdIdx: index('payments_order_id_idx').on(table.orderId),
+    customerEmailIdx: index('payments_customer_email_idx').on(table.customerEmail),
+    createdAtIdx: index('payments_created_at_idx').on(table.createdAt),
+    paidAtIdx: index('payments_paid_at_idx').on(table.paidAt),
+    // Composite indexes for common queries
+    userStatusIdx: index('payments_user_status_idx').on(table.userId, table.status),
+    statusCreatedIdx: index('payments_status_created_idx').on(table.status, table.createdAt),
+}));
+
+// ========================================
 // SYSTEM CONFIGURATION
 // ========================================
 
@@ -570,3 +629,6 @@ export type NewUserModelProvider = typeof userModelProviders.$inferInsert;
 
 export type Star = typeof stars.$inferSelect;
 export type NewStar = typeof stars.$inferInsert;
+
+export type Payment = typeof payments.$inferSelect;
+export type NewPayment = typeof payments.$inferInsert;

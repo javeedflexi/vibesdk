@@ -20,7 +20,7 @@ export function getSystemPromptWithProjectContext(
     serializerType: CodeSerializerType = CodeSerializerType.SIMPLE,
     sharePhases: boolean = true
 ): Message[] {
-    const { query, blueprint, templateDetails, dependencies, allFiles, commandsHistory } = context;
+    const { query, blueprint, templateDetails, dependencies, allFiles, commandsHistory, customData } = context;
 
     const messages = [
         createSystemMessage(generalSystemPromptBuilder(systemPrompt, {
@@ -28,7 +28,7 @@ export function getSystemPromptWithProjectContext(
             blueprint,
             templateDetails,
             dependencies,
-        })), 
+        }, customData)), 
         createUserMessage(
             USER_PROMPT_FORMATTER.PROJECT_CONTEXT(
                 sharePhases ? GenerationContext.getCompletedPhases(context) : [],

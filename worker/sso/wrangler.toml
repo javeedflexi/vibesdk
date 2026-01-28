@@ -1,0 +1,80 @@
+# SSO Handoff Worker Configuration
+name = "vibe-sso-handoff"
+main = "index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "VIBE_DB"
+database_name = "vibe-sso-db"
+database_id = "7d860f8d-b56c-4916-a062-9f8905336f0e"  # Will use local DB in development
+
+# Environment variables
+[vars]
+# Flexi JWT verification
+FLEXI_JWKS_URL = "https://devapi.flexifunnels.com/.well-known/jwks.json"
+FLEXI_ISS = "flexi"
+FLEXI_AUD = "vibe-handoff"
+
+# Vibe access token
+VIBE_ISS = "vibe-edge"
+VIBE_AUD = "vibe-app"
+
+# Cookie configuration
+VIBE_COOKIE_NAME = "vibe_access"
+VIBE_COOKIE_DOMAIN = ".flexifunnels.page"
+
+# Routing
+PROTECTED_PREFIX = "/apps"
+VIBE_ORIGIN = "https://dev-build.flexifunnels.page"
+
+# Migration control (set to "true" only when needed)
+ALLOW_MIGRATE = "false"
+
+# Secrets (set via `wrangler secret put <NAME>`)
+# VIBE_ACCESS_SECRET - Set via: wrangler secret put VIBE_ACCESS_SECRET --env production
+
+# Development overrides
+[env.dev]
+
+[[env.dev.d1_databases]]
+binding = "VIBE_DB"
+database_name = "vibe-sso-db"
+database_id = "7d860f8d-b56c-4916-a062-9f8905336f0e"
+
+[env.dev.vars]
+FLEXI_JWKS_URL = "https://devapi.flexifunnels.com/.well-known/jwks.json"
+FLEXI_ISS = "flexi"
+FLEXI_AUD = "vibe-handoff"
+VIBE_ISS = "vibe-edge"
+VIBE_AUD = "vibe-app"
+VIBE_COOKIE_NAME = "vibe_access"
+VIBE_COOKIE_DOMAIN = "localhost"
+PROTECTED_PREFIX = "/apps"
+VIBE_ORIGIN = "http://localhost:5174"
+ALLOW_MIGRATE = "true"
+
+# Production configuration
+[env.production]
+
+[[env.production.d1_databases]]
+binding = "VIBE_DB"
+database_name = "vibe-sso-db"
+database_id = "7d860f8d-b56c-4916-a062-9f8905336f0e"
+
+[env.production.vars]
+FLEXI_JWKS_URL = "https://devapi.flexifunnels.com/.well-known/jwks.json"
+FLEXI_ISS = "flexi"
+FLEXI_AUD = "vibe-handoff"
+VIBE_ISS = "vibe-edge"
+VIBE_AUD = "vibe-app"
+VIBE_COOKIE_NAME = "vibe_access"
+VIBE_COOKIE_DOMAIN = ".flexifunnels.page"
+PROTECTED_PREFIX = "/apps"
+VIBE_ORIGIN = "https://dev-build.flexifunnels.page"
+ALLOW_MIGRATE = "false"
+
+routes = [
+  { pattern = "sso.flexifunnels.page/*", zone_name = "flexifunnels.page" }
+]
