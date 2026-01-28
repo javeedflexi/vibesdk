@@ -36,7 +36,7 @@ function setOriginControl(env: Env, request: Request, currentHeaders: Headers): 
  * Handles requests for user-deployed applications on subdomains.
  * It first attempts to proxy to a live development sandbox. If that fails,
  * it dispatches the request to a permanently deployed worker via namespaces.
- * This function will NOT fall back to the main worker..
+ * This function will NOT fall back to the main worker.. ..
  *
  * @param request The incoming Request object.
  * @param env The environment bindings.
