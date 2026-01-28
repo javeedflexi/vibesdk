@@ -4,7 +4,7 @@
  */
  {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "vibesdk-production",
+	"name": "vibesdk-production-fork",
 	"main": "worker/index.ts",
 	"compatibility_date": "2025-08-10",
 	"compatibility_flags": ["nodejs_compat"],
@@ -74,8 +74,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "vibesdk-db",
-			"database_id": "c4721a2b-b96a-428a-8b2a-b3d255b307e9",
+			"database_name": "vibesdk-db-fork",
+			"database_id": "555f064a-9834-4ee7-b0c7-93e378c7ec3b",
 			"migrations_dir": "migrations",
 			"remote": true
 		}
@@ -103,14 +103,14 @@
     "r2_buckets": [
       {
         "binding": "TEMPLATES_BUCKET",
-        "bucket_name": "vibesdk-templates",
-        "remote": true
+        "bucket_name": "vibesdk-templates-frok",
+        "remote": true,"preview_bucket_name": "vibesdk-templates-frok"
       }
     ],
     "kv_namespaces": [
         {
             "binding": "VibecoderStore",
-            "id": "f066f3c2e4824981b48e8586c04db9c1",
+            "id": "95ce5caee4f84b8dbe962496c0f77b25",
             "remote": true
         }
     ],
@@ -151,10 +151,10 @@
     ],
 	"vars": {
         "TEMPLATES_REPOSITORY": "https://github.com/cloudflare/vibesdk-templates",
-        "ALLOWED_EMAIL": "",
-        "DISPATCH_NAMESPACE": "vibesdk-default-namespace",
+        "ALLOWED_EMAIL": "sb@flexifunnels.com",
+        "DISPATCH_NAMESPACE": "vibesdk-default-namespace-fork",
         "ENABLE_READ_REPLICAS": "true",
-        "CLOUDFLARE_AI_GATEWAY": "vibesdk-gateway",
+        "CLOUDFLARE_AI_GATEWAY": "vibesdk-gateway-fork",
         "PLATFORM_CAPABILITIES": {
             "features": {
                 "app": {
@@ -169,9 +169,9 @@
             },
             "version": "1.0.0"
         },
-        "CUSTOM_DOMAIN": "",
+        "CUSTOM_DOMAIN": "build-dev.flexifunnels.page",
         "MAX_SANDBOX_INSTANCES": "10",
-        "SANDBOX_INSTANCE_TYPE": "standard-3"
+        "SANDBOX_INSTANCE_TYPE": "standard-4"
     },
 	"workers_dev": false,
 	"preview_urls": false
