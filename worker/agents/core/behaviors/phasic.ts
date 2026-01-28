@@ -612,7 +612,8 @@ export class PhasicCodingBehavior extends BaseCodingBehavior<PhasicState> implem
         });
 
         // Await the already-created realtime code fixer promises
-        const finalFiles = await Promise.allSettled(result.fixedFilePromises).then((results: PromiseSettledResult<FileOutputType>[]) => {
+        const fixedPromises = result.fixedFilePromises || [];
+        const finalFiles = await Promise.allSettled(fixedPromises).then((results) => {
             return results.map((result) => {
                 if (result.status === 'fulfilled') {
                     return result.value;

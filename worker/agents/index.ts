@@ -45,9 +45,9 @@ export async function cloneAgent(env: Env, agentId: string) : Promise<{newAgentI
     }
     const newAgentId = generateId();
 
-    const originalState = await agentInstance.getFullState();
+    const originalState = await agentInstance.getFullState() as AgentState;
 
-    const newState: AgentState = {
+    const baseState: any = {
         ...originalState,
         sessionId: newAgentId,
         sandboxInstanceId: undefined,
@@ -56,11 +56,16 @@ export async function cloneAgent(env: Env, agentId: string) : Promise<{newAgentI
         projectUpdatesAccumulator: [],
         reviewingInitiated: false,
         mvpGenerated: false,
-        ...(originalState.behaviorType === 'phasic' ? {
+    };
+
+    const newState: AgentState = originalState.behaviorType === 'phasic'
+        ? {
+            ...baseState,
+            behaviorType: 'phasic' as const,
             generatedPhases: [],
             currentDevState: CurrentDevState.IDLE,
-        } : {}),
-    } as AgentState;
+        } as AgentState
+        : baseState as AgentState;
 
     const newAgent = await getAgentStub(env, newAgentId, {
         behaviorType: originalState.behaviorType,

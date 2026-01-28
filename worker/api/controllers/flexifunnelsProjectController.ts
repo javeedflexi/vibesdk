@@ -1,5 +1,5 @@
 import { Context } from 'hono';
-import { FlexiFunnelsApiService } from '../../../services/flexifunnels/FlexiFunnelsApiService';
+import { FlexiFunnelsApiService } from '../../services/flexifunnels/FlexiFunnelsApiService';
 
 /**
  * Controller for creating projects with live FlexiFunnels data

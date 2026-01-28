@@ -71,6 +71,8 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
         hostname: '',
         blueprint: {} as unknown as Blueprint,
         templateName: '',
+        templateDetails: {} as any,
+        inferenceContext: {} as any,
         generatedFilesMap: {},
         conversationMessages: [],
         metadata: {} as InferenceMetadata,
@@ -86,6 +88,7 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
         generatedPhases: [],
         currentDevState: CurrentDevState.IDLE,
         phasesCounter: MAX_PHASES,
+        currentPlan: [] as any,
     } as AgentState;
 
     constructor(ctx: AgentContext, env: Env) {

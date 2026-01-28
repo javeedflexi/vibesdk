@@ -4,6 +4,7 @@ import { executeInference } from '../inferutils/infer';
 import { PROMPT_UTILS } from '../prompts';
 import { ScreenshotData } from '../core/types';
 import { AgentOperation, OperationOptions } from './common';
+import { GenerationContext } from '../domain/values/GenerationContext';
 import { OperationError } from '../utils/operationError';
 
 export interface ScreenshotAnalysisInput {

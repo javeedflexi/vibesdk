@@ -31,28 +31,59 @@ export class GenerationContext {
     /**
      * Create context from current state
      */
-    static from(state: CodeGenState, logger?: Pick<StructuredLogger, 'info' | 'warn'>): GenerationContext {
+    static from(state: CodeGenState, templateDetails?: TemplateDetails, logger?: Pick<StructuredLogger, 'info' | 'warn'>): GenerationContext {
+        const template = templateDetails || state.templateDetails;
         const dependencies = DependencyManagement.mergeDependencies(
-            state.templateDetails?.deps || {},
+            template?.deps || {},
             state.lastPackageJson,
             logger
         );
 
         const allFiles = FileProcessing.getAllFiles(
-            state.templateDetails,
+            template,
             state.generatedFilesMap
         );
+
+        const generatedPhases = (state as any).generatedPhases || [];
 
         return new GenerationContext(
             state.query,
             state.blueprint,
-            state.templateDetails,
+            template,
             dependencies,
             allFiles,
-            state.generatedPhases,
+            generatedPhases,
             state.commandsHistory || [],
-    undefined
+            (state as any).customData
         );
+    }
+
+    /**
+     * Check if context is for phasic behavior
+     */
+    static isPhasic(context: GenerationContext): context is PhasicGenerationContext {
+        return 'views' in context.blueprint;
+    }
+
+    /**
+     * Check if context is for agentic behavior
+     */
+    static isAgentic(context: GenerationContext): context is AgenticGenerationContext {
+        return 'plan' in context.blueprint;
+    }
+
+    /**
+     * Get completed phases (static version for compatibility)
+     */
+    static getCompletedPhases(context: GenerationContext): PhaseState[] {
+        return context.getCompletedPhases();
+    }
+
+    /**
+     * Get file tree (static version for compatibility)
+     */
+    static getFileTree(context: GenerationContext): FileTreeNode {
+        return context.getFileTree();
     }
 
     /**
@@ -257,3 +288,7 @@ class FileTreeBuilder {
         return segments[segments.length - 1] || path;
     }
 }
+
+// Type aliases for specialized generation contexts
+export type PhasicGenerationContext = GenerationContext;
+export type AgenticGenerationContext = GenerationContext;

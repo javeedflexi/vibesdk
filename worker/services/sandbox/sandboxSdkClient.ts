@@ -2007,4 +2007,10 @@ export class SandboxSdkClient extends BaseSandboxService {
         }
         return 'https';
     }
+
+    async pushToGitHub(_instanceId: string, _request: any, _files: any[]): Promise<any> {
+        // This method is not implemented in SandboxSdkClient
+        // It should be used with RemoteSandboxService instead
+        throw new Error('pushToGitHub is not supported in SandboxSdkClient. Use RemoteSandboxService instead.');
+    }
 }

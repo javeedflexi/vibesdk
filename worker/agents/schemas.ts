@@ -161,3 +161,26 @@ export const ConversationalResponseSchema = z.object({
 export type ConversationalResponseType = z.infer<typeof ConversationalResponseSchema>;
 
 export type Blueprint = z.infer<typeof PhasicBlueprintSchema> | z.infer<typeof AgenticBlueprintSchema>;
+
+// Export BlueprintSchema as an alias for PhasicBlueprintSchema for backward compatibility
+export const BlueprintSchema = PhasicBlueprintSchema;
+
+// Client-reported error schema for error handling
+export const ClientReportedErrorSchema = z.object({
+    message: z.string().describe('Error message'),
+    stack: z.string().optional().describe('Error stack trace'),
+    componentStack: z.string().optional().describe('Component stack trace'),
+});
+
+export type ClientReportedErrorType = z.infer<typeof ClientReportedErrorSchema>;
+
+// Agent action type enum
+export enum AgentActionType {
+    GENERATE_BLUEPRINT = 'generate_blueprint',
+    GENERATE_PHASE = 'generate_phase',
+    IMPLEMENT_PHASE = 'implement_phase',
+    REGENERATE_FILE = 'regenerate_file',
+    USER_CONVERSATION = 'user_conversation',
+    CODE_REVIEW = 'code_review',
+    DEEP_DEBUG = 'deep_debug',
+}

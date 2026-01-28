@@ -375,15 +375,17 @@ export class SecretsService extends BaseService {
         return {
             id: secret.id,
             userId: secret.userId,
-            name: secret.name,
-            provider: secret.provider,
-            secretType: secret.secretType,
-            keyPreview: secret.keyPreview,
+            name: secret.name || '',
+            key: secret.key,
+            provider: secret.provider || '',
+            secretType: secret.secretType || '',
+            encryptedValue: secret.encryptedValue,
+            keyPreview: secret.keyPreview || '',
             description: secret.description,
             expiresAt: secret.expiresAt,
             lastUsed: secret.lastUsed,
-            usageCount: secret.usageCount,
-            isActive: secret.isActive,
+            usageCount: secret.usageCount || 0,
+            isActive: secret.isActive || false,
             createdAt: secret.createdAt,
             updatedAt: secret.updatedAt
         };

@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { 
+import {
 	createProjectWithFlexiFunnelsData,
-	testFlexiFunnelsData 
-} from '../controllers/project/flexifunnelsProjectController';
+	testFlexiFunnelsData
+} from '../controllers/flexifunnelsProjectController';
 
 const flexifunnelsProjectRoutes = new Hono();
 

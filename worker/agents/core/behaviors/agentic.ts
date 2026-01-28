@@ -3,7 +3,7 @@ import { AgentInitArgs } from '../types';
 import { AgenticState } from '../state';
 import { WebSocketMessageResponses } from '../../constants';
 import { UserConversationProcessor } from '../../operations/UserConversationProcessor';
-import { GenerationContext, AgenticGenerationContext } from '../../domain/values/GenerationContext';
+import { GenerationContext } from '../../domain/values/GenerationContext';
 import { PhaseImplementationOperation } from '../../operations/PhaseImplementation';
 import { FileRegenerationOperation } from '../../operations/FileRegeneration';
 import { AgenticProjectBuilderOperation, AgenticProjectBuilderInputs } from '../../operations/AgenticProjectBuilder';
@@ -227,7 +227,7 @@ export class AgenticCodingBehavior extends BaseCodingBehavior<AgenticState> impl
         }
     }
 
-    getOperationOptions(): OperationOptions<AgenticGenerationContext> {
+    getOperationOptions(): OperationOptions<GenerationContext> {
         const context = GenerationContext.from(this.state, this.getTemplateDetails(), this.logger);
         if (!GenerationContext.isAgentic(context)) {
             throw new Error('Expected AgenticGenerationContext');

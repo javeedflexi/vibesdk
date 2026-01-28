@@ -216,7 +216,7 @@ export class CodeReviewOperation extends AgentOperation<GenerationContext, CodeR
                 env: env,
                 messages,
                 schema: CodeReviewOutput,
-                agentActionName: "codeReview",
+                agentActionName: "reviewCode" as any,
                 context: options.inferenceContext,
                 reasoning_effort: issues.runtimeErrors.length || issues.staticAnalysis.lint.issues.length || issues.staticAnalysis.typecheck.issues.length > 0 ? undefined : 'low',
                 // format: 'markdown'

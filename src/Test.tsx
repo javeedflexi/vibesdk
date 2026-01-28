@@ -10,7 +10,7 @@ export default function TestSSOUser() {
 		try {
 			const response = await apiClient.getUserByEmail(user?.email || '');
 
-			console.log(response.data?.user);
+			console.log(response.data);
 		} catch (err) {
 			console.log(err);
 		}

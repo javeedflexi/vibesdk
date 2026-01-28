@@ -8,7 +8,8 @@ import { TemplateRegistry } from './inferutils/schemaFormatters';
 import z from 'zod';
 import {
 	Blueprint,
-	BlueprintSchema,
+	PhasicBlueprintSchema,
+	AgenticBlueprintSchema,
 	ClientReportedErrorSchema,
 	ClientReportedErrorType,
 	FileOutputType,
@@ -189,6 +190,10 @@ ${typecheckOutput}`;
 	): string {
 		// Use scof format
 		return CODE_SERIALIZERS[serializerType](files);
+	},
+
+	summarizeFiles(files: FileOutputType[]): string {
+		return files.map(file => `${file.filePath}: ${file.filePurpose}`).join('\n');
 	},
 
 	REACT_RENDER_LOOP_PREVENTION: `<REACT_RENDER_LOOP_PREVENTION>
@@ -724,6 +729,10 @@ bun add @geist-ui/react@1
     When a changes to a file are big or the file itself is small, it is better to use \`full_content\` format, otherwise use \`unified_diff\` format. In the end, you should choose a format that minimizes the total length of response.
 </CODE CONTENT GENERATION RULES>
 `,
+	UI_NON_NEGOTIABLES_V3: `## UI MASTERY & VISUAL EXCELLENCE STANDARDS
+
+**CRITICAL: THESE ARE NON-NEGOTIABLE REQUIREMENTS FOR ALL UI WORK**`,
+
 	UI_GUIDELINES: `## UI MASTERY & VISUAL EXCELLENCE STANDARDS
     
     ### 🎨 VISUAL HIERARCHY MASTERY
@@ -1017,9 +1026,14 @@ export function generalSystemPromptBuilder(
 
 	// Optional blueprint variables
 	if (params.blueprint) {
+		// Handle both phasic and agentic blueprints
+		const blueprintSchema = 'views' in params.blueprint
+			? PhasicBlueprintSchema
+			: AgenticBlueprintSchema;
+
 		variables.blueprint = TemplateRegistry.markdown.serialize(
 			params.blueprint,
-			BlueprintSchema,
+			blueprintSchema,
 		);
 		variables.blueprintDependencies =
 			params.blueprint.frameworks?.join(', ') ?? '';

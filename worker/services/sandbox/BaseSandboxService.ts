@@ -315,4 +315,10 @@ export abstract class BaseSandboxService {
     // GITHUB INTEGRATION (Required)
     // ==========================================
 
+    /**
+     * Push files to GitHub repository
+     * Returns: { success: boolean, commitSha?: string, error?: string }
+     */
+    abstract pushToGitHub(instanceId: string, request: any, files: any[]): Promise<any>;
+
 }

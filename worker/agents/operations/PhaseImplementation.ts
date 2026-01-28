@@ -1,8 +1,8 @@
-import { TemplateRegistry } from '../../inferutils/schemaFormatters';
-import { PhaseConceptSchema, type PhaseConceptType } from '../../schemas';
-import type { IssueReport } from '../../domain/values/IssueReport';
-import type { UserContext } from '../../core/types';
-import { issuesPromptFormatter, PROMPT_UTILS } from '../../prompts';
+import { TemplateRegistry } from '../inferutils/schemaFormatters';
+import { PhaseConceptSchema, type PhaseConceptType } from '../schemas';
+import type { IssueReport } from '../domain/values/IssueReport';
+import type { UserContext } from '../core/types';
+import { issuesPromptFormatter, PROMPT_UTILS } from '../prompts';
 
 // Helper function to format live FlexiFunnels data for the prompt
 export function formatLiveData(customData?: any): string {
@@ -313,4 +313,44 @@ export function buildPhaseImplementationUserPrompt(args: {
 		userSuggestionsText: formatUserSuggestions(args.userContext?.suggestions),
 		fileCount,
 	});
+}
+
+// Import required types for the operation class
+import { AgentOperation, OperationOptions } from './common';
+import { GenerationContext } from '../domain/values/GenerationContext';
+import { FileOutputType } from '../schemas';
+
+export interface PhaseImplementationInputs {
+	phase: PhaseConceptType;
+	issues: IssueReport;
+	isFirstPhase?: boolean;
+	fileGeneratingCallback?: (filePath: string, filePurpose: string) => void;
+	userContext?: UserContext;
+	shouldAutoFix?: boolean;
+	fileChunkGeneratedCallback?: (filePath: string, chunk: string, format: 'full_content' | 'unified_diff') => void;
+	fileClosedCallback?: (file: FileOutputType, message: string) => void;
+}
+
+export interface PhaseImplementationResult {
+	files: FileOutputType[];
+	deploymentNeeded: boolean;
+	commands: string[];
+	fixedFilePromises?: Promise<FileOutputType>[];
+}
+
+/**
+ * PhaseImplementationOperation - Implements a phase of the project
+ * This is a stub operation that delegates to the actual implementation logic
+ */
+export class PhaseImplementationOperation extends AgentOperation<GenerationContext, PhaseImplementationInputs, PhaseImplementationResult> {
+	async execute(
+		_inputs: PhaseImplementationInputs,
+		_options: OperationOptions<GenerationContext>
+	): Promise<PhaseImplementationResult> {
+		throw new Error('PhaseImplementationOperation.execute() is not yet fully implemented. This operation is handled by legacy code paths.');
+	}
+
+	async generateReadme(_options: OperationOptions<GenerationContext>): Promise<FileOutputType> {
+		throw new Error('PhaseImplementationOperation.generateReadme() is not yet fully implemented. This operation is handled by legacy code paths.');
+	}
 }

@@ -632,3 +632,53 @@ export type NewStar = typeof stars.$inferInsert;
 
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
+
+// ========================================
+// USER SECRETS STORE
+// ========================================
+
+/**
+ * User Secrets table - Encrypted storage for user API keys
+ * Managed by UserSecretsStore Durable Object
+ */
+export const userSecrets = sqliteTable('user_secrets', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+    // Secret Details
+    name: text('name').notNull(), // User-friendly name for the secret
+    key: text('key').notNull(), // Secret key name (e.g., 'openai_api_key')
+    encryptedValue: text('encrypted_value').notNull(), // Encrypted secret value
+    keyPreview: text('key_preview'), // Preview of the key (e.g., "sk_***1234")
+    version: integer('version').notNull().default(1), // For key rotation
+
+    // Classification
+    provider: text('provider'), // Provider name (e.g., 'openai', 'anthropic')
+    secretType: text('secret_type'), // Type of secret (e.g., 'api_key', 'token')
+
+    // Status
+    isActive: integer('is_active', { mode: 'boolean' }).default(true),
+
+    // Usage tracking
+    lastUsed: integer('last_used', { mode: 'timestamp' }),
+    usageCount: integer('usage_count').default(0),
+
+    // Metadata
+    description: text('description'), // Optional description
+    lastAccessedAt: integer('last_accessed_at', { mode: 'timestamp' }),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }), // Optional expiration
+
+    // Timestamps
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }), // Soft delete
+}, (table) => ({
+    userKeyIdx: uniqueIndex('user_secrets_user_key_idx').on(table.userId, table.key),
+    userIdx: index('user_secrets_user_idx').on(table.userId),
+    isActiveIdx: index('user_secrets_is_active_idx').on(table.isActive),
+    expiresAtIdx: index('user_secrets_expires_at_idx').on(table.expiresAt),
+    deletedAtIdx: index('user_secrets_deleted_at_idx').on(table.deletedAt),
+}));
+
+export type UserSecret = typeof userSecrets.$inferSelect;
+export type NewUserSecret = typeof userSecrets.$inferInsert;

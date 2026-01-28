@@ -16,6 +16,9 @@ import type {
   AgentDisplayConfig
 } from '@/api-types';
 
+// Re-export AgentDisplayConfig for use in other components
+export type { AgentDisplayConfig };
+
 interface ModelConfigTabsProps {
   agentConfigs: AgentDisplayConfig[];
   modelConfigs: Record<string, UserModelConfigWithMetadata>;

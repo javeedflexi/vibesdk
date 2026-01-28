@@ -33,7 +33,7 @@ export const MAX_PHASES = 10;
 export interface BaseProjectState {
     behaviorType: BehaviorType;
     projectType: ProjectType;
-    
+
     // Identity
     projectName: string;
     query: string;
@@ -43,16 +43,18 @@ export interface BaseProjectState {
     blueprint: Blueprint;
 
     templateName: string | 'custom';
-    
+    templateDetails: any; // TemplateDetails from sandboxTypes
+
     // Inference context
     readonly metadata: InferenceMetadata;
-    
+    inferenceContext: any; // InferenceContext from inferutils
+
     // Generation control
     shouldBeGenerating: boolean;
-    
+
     // Common file storage
     generatedFilesMap: Record<string, FileState>;
-    
+
     // Common infrastructure
     sandboxInstanceId?: string;
     fileServingToken?: FileServingToken;
@@ -60,7 +62,8 @@ export interface BaseProjectState {
     lastPackageJson?: string;
     pendingUserInputs: string[];
     projectUpdatesAccumulator: string[];
-    
+    clientReportedErrors?: any[];
+
     // Deep debug
     lastDeepDebugTranscript: string | null;
 
@@ -73,11 +76,14 @@ export interface PhasicState extends BaseProjectState {
     behaviorType: 'phasic';
     blueprint: PhasicBlueprint;
     generatedPhases: PhaseState[];
-    
+
     phasesCounter: number;
     currentDevState: CurrentDevState;
     reviewCycles?: number;
     currentPhase?: PhaseConceptType;
+    agentMode?: string; // For backward compatibility
+    conversationMessages?: any[]; // ConversationMessage[]
+    generationPromise?: Promise<any>;
 }
 
 export interface WorkflowMetadata {
@@ -114,6 +120,19 @@ export interface AgenticState extends BaseProjectState {
     behaviorType: 'agentic';
     blueprint: AgenticBlueprint;
     currentPlan: Plan;
+
+    // For backward compatibility with simpleGeneratorAgent
+    agentMode?: string;
+    generatedPhases?: PhaseState[];
+    phasesCounter?: number;
+    reviewCycles?: number;
+    currentPhase?: PhaseConceptType;
+    currentDevState?: CurrentDevState;
+    conversationMessages?: any[];
+    generationPromise?: Promise<any>;
 }
 
 export type AgentState = PhasicState | AgenticState;
+
+// Legacy alias for backward compatibility
+export type CodeGenState = AgentState;

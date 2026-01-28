@@ -327,8 +327,19 @@ export interface SecretData {
  * Encrypted secret structure
  */
 export interface EncryptedSecret {
+    id: string;
+    userId: string;
+    name: string;
     provider: string;
+    secretType: string;
     key: string;
     encryptedValue: string;
     keyPreview: string;
+    description: string | null;
+    expiresAt: Date | null;
+    lastUsed: Date | null;
+    usageCount: number;
+    isActive: boolean;
+    createdAt: Date | null;
+    updatedAt: Date | null;
 }

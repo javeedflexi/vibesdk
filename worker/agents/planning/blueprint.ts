@@ -313,12 +313,12 @@ export async function generateBlueprint(
         
         const systemPromptMessage = createSystemMessage(generalSystemPromptBuilder(systemPrompt, {
             query,
-            templateDetails,
+            templateDetails: templateDetails!,
             frameworks,
             templateMetaInfo,
             blueprint: undefined,
             language,
-            dependencies: templateDetails?.deps,
+            dependencies: templateDetails?.deps || {},
         }));
 
         const userMessage = images && images.length > 0

@@ -59,6 +59,7 @@ export type Plan = string;
 export interface AllIssues {
     runtimeErrors: RuntimeError[];
     staticAnalysis: StaticAnalysisResponse;
+    clientErrors?: any[];
 }
 
 /**

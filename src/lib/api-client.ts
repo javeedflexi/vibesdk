@@ -638,6 +638,36 @@ class ApiClient {
 		});
 	}
 
+	/**
+	 * Get user by email address
+	 */
+	async getUserByEmail(email: string): Promise<ApiResponse<{ id: string; email: string; username?: string; displayName: string }>> {
+		const params = new URLSearchParams({ email });
+		return this.request<{ id: string; email: string; username?: string; displayName: string }>(`/api/user/by-email?${params.toString()}`);
+	}
+
+	/**
+	 * Create project and page (FlexiFunnels integration)
+	 */
+	async createProjectAndPage(
+		projectId: number,
+		pagePath: string,
+		pageName: string,
+		templateId: number,
+		deploymentId: string,
+	): Promise<ApiResponse<{ projectId: number; pageId: number; pageUrl: string }>> {
+		return this.request<{ projectId: number; pageId: number; pageUrl: string }>('/api/flexifunnels/create-project-page', {
+			method: 'POST',
+			body: {
+				projectId,
+				pagePath,
+				pageName,
+				templateId,
+				deploymentId,
+			},
+		});
+	}
+
 	// ===============================
 	// Stats API Methods
 	// ===============================
